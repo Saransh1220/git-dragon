@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
 ### Changed
 
 - Forked from git-koi: the koi is now a baby dragon seen from the side. It has bat
