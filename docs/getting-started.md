@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let snapshot_json = std::fs::read_to_string("snapshot.json")?;
     let account_snapshot: AccountSnapshot = serde_json::from_str(&snapshot_json)?;
     let dragon_development = derive_dragon_development(&account_snapshot)?;
-    let dragon_body = DragonBody::Asagi;
+    let dragon_body = DragonBody::Azure;
     let behavior = select_behavior(&dragon_development);
     let flight_frames: Vec<_> = (0..frame_count(behavior))
         .map(|frame_index| render_flight_frame(&dragon_development, dragon_body, behavior, frame_index))
