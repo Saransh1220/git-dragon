@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use chrono::Days;
-use git_koi::behavior::{Behavior, select_behavior};
-use git_koi::coat::KoiBody;
-use git_koi::history::{AccountSnapshot, ContributionDay};
-use git_koi::koi::{KoiDevelopment, derive_koi_development};
-use git_koi::motion::frame_count;
-use git_koi::output::{encode_gif, encode_png};
-use git_koi::render::{KoiFrame, render_koi, render_swim_frame};
+use git_dragon::behavior::{Behavior, select_behavior};
+use git_dragon::coat::DragonBody;
+use git_dragon::history::{AccountSnapshot, ContributionDay};
+use git_dragon::dragon::{DragonDevelopment, derive_dragon_development};
+use git_dragon::motion::frame_count;
+use git_dragon::output::{encode_gif, encode_png};
+use git_dragon::render::{DragonFrame, render_dragon, render_flight_frame};
 
 const HISTORY_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -18,7 +18,7 @@ const HISTORY_FIXTURE: &str = concat!(
 
 #[test]
 fn render_writes_the_days_loop_still_and_preview_as_the_renderer_draws_them() {
-    // Two quiet weeks make the koi rest, so the loop can't pass as the fallback cruise.
+    // Two quiet weeks make the dragon rest, so the loop can't pass as the fallback cruise.
     let mut account_snapshot = read_fixture_snapshot();
     let contribution_history = account_snapshot.contribution_history.as_mut().unwrap();
     for day_offset in 1..=14 {
@@ -35,8 +35,8 @@ fn render_writes_the_days_loop_still_and_preview_as_the_renderer_draws_them() {
         serde_json::to_string(&account_snapshot).unwrap(),
     )
     .unwrap();
-    let output_directory = scratch_directory.join("koi");
-    let command_output = run_git_koi(&[
+    let output_directory = scratch_directory.join("dragon");
+    let command_output = run_git_dragon(&[
         "render",
         snapshot_path.to_str().unwrap(),
         "--output-dir",
@@ -49,76 +49,76 @@ fn render_writes_the_days_loop_still_and_preview_as_the_renderer_draws_them() {
         String::from_utf8_lossy(&command_output.stderr)
     );
 
-    let koi_development = derive_koi_development(&account_snapshot).unwrap();
-    let behavior = select_behavior(&koi_development);
+    let dragon_development = derive_dragon_development(&account_snapshot).unwrap();
+    let behavior = select_behavior(&dragon_development);
     assert_eq!(behavior, Behavior::Rest);
-    let swim_frames: Vec<KoiFrame> = (0..frame_count(behavior))
+    let flight_frames: Vec<DragonFrame> = (0..frame_count(behavior))
         .map(|frame_index| {
-            render_swim_frame(&koi_development, KoiBody::White, behavior, frame_index)
+            render_flight_frame(&dragon_development, DragonBody::Emerald, behavior, frame_index)
         })
         .collect();
     assert_eq!(
-        fs::read(output_directory.join("koi.gif")).unwrap(),
-        encode_gif(&swim_frames).unwrap()
+        fs::read(output_directory.join("dragon.gif")).unwrap(),
+        encode_gif(&flight_frames).unwrap()
     );
     assert_eq!(
-        fs::read(output_directory.join("koi.png")).unwrap(),
-        encode_png(&render_koi(&koi_development, KoiBody::White)).unwrap()
+        fs::read(output_directory.join("dragon.png")).unwrap(),
+        encode_png(&render_dragon(&dragon_development, DragonBody::Emerald)).unwrap()
     );
     let preview_html = fs::read_to_string(output_directory.join("preview.html")).unwrap();
-    assert!(preview_html.contains(r#"src="koi.gif""#));
-    assert!(preview_html.contains(r#"src="koi.png""#));
+    assert!(preview_html.contains(r#"src="dragon.gif""#));
+    assert!(preview_html.contains(r#"src="dragon.png""#));
     assert!(!preview_html.contains("<script"));
     let summary_line = String::from_utf8_lossy(&command_output.stdout);
-    let observation_date = koi_development.observed_on.to_string();
+    let observation_date = dragon_development.observed_on.to_string();
     assert!(summary_line.contains(&observation_date));
     assert!(preview_html.contains(&observation_date));
 }
 
 #[test]
-fn the_body_option_redraws_the_koi_in_that_body() {
-    let output_directory = fresh_directory("render-black");
-    let command_output = run_git_koi(&[
+fn the_body_option_redraws_the_dragon_in_that_body() {
+    let output_directory = fresh_directory("render-obsidian");
+    let command_output = run_git_dragon(&[
         "render",
         HISTORY_FIXTURE,
         "--output-dir",
         output_directory.to_str().unwrap(),
         "--body",
-        "black",
+        "obsidian",
     ]);
     assert_eq!(command_output.status.code(), Some(0));
-    let koi_development = read_fixture_development();
-    let black_png = encode_png(&render_koi(&koi_development, KoiBody::Black)).unwrap();
+    let dragon_development = read_fixture_development();
+    let obsidian_png = encode_png(&render_dragon(&dragon_development, DragonBody::Obsidian)).unwrap();
     assert_ne!(
-        black_png,
-        encode_png(&render_koi(&koi_development, KoiBody::White)).unwrap()
+        obsidian_png,
+        encode_png(&render_dragon(&dragon_development, DragonBody::Emerald)).unwrap()
     );
     assert_eq!(
-        fs::read(output_directory.join("koi.png")).unwrap(),
-        black_png
+        fs::read(output_directory.join("dragon.png")).unwrap(),
+        obsidian_png
     );
-    assert!(String::from_utf8_lossy(&command_output.stdout).contains("black body"));
+    assert!(String::from_utf8_lossy(&command_output.stdout).contains("obsidian body"));
 }
 
 #[test]
 fn a_failed_render_exits_one_and_keeps_the_previous_files() {
     let output_directory = fresh_directory("render-failure");
-    for file_name in ["koi.gif", "koi.png", "preview.html"] {
+    for file_name in ["dragon.gif", "dragon.png", "preview.html"] {
         fs::write(
             output_directory.join(file_name),
             format!("previous {file_name}"),
         )
         .unwrap();
     }
-    let command_output = run_git_koi(&[
+    let command_output = run_git_dragon(&[
         "render",
         concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/account.json"),
         "--output-dir",
         output_directory.to_str().unwrap(),
     ]);
     assert_eq!(command_output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&command_output.stderr).starts_with("git-koi: "));
-    for file_name in ["koi.gif", "koi.png", "preview.html"] {
+    assert!(String::from_utf8_lossy(&command_output.stderr).starts_with("git-dragon: "));
+    for file_name in ["dragon.gif", "dragon.png", "preview.html"] {
         assert_eq!(
             fs::read_to_string(output_directory.join(file_name)).unwrap(),
             format!("previous {file_name}")
@@ -131,17 +131,17 @@ fn a_failed_render_exits_one_and_keeps_the_previous_files() {
 fn render_usage_errors_exit_two_and_help_exits_zero() {
     for invalid_arguments in [
         &["render", HISTORY_FIXTURE][..],
-        &["render", "--output-dir", "koi"],
+        &["render", "--output-dir", "dragon"],
         &[
             "render",
             HISTORY_FIXTURE,
             "--output-dir",
-            "koi",
+            "dragon",
             "--body",
             "red",
         ],
     ] {
-        let command_output = run_git_koi(invalid_arguments);
+        let command_output = run_git_dragon(invalid_arguments);
         assert_eq!(
             command_output.status.code(),
             Some(2),
@@ -149,18 +149,18 @@ fn render_usage_errors_exit_two_and_help_exits_zero() {
         );
         assert!(String::from_utf8_lossy(&command_output.stderr).starts_with("Usage:"));
     }
-    let help_output = run_git_koi(&["render", "--help"]);
+    let help_output = run_git_dragon(&["render", "--help"]);
     assert_eq!(help_output.status.code(), Some(0));
-    assert!(String::from_utf8_lossy(&help_output.stdout).contains("platinum"));
+    assert!(String::from_utf8_lossy(&help_output.stdout).contains("silver"));
 }
 
 #[test]
 fn version_prints_the_manifest_version_and_exits_zero() {
-    let version_output = run_git_koi(&["--version"]);
+    let version_output = run_git_dragon(&["--version"]);
     assert_eq!(version_output.status.code(), Some(0));
     assert_eq!(
         String::from_utf8_lossy(&version_output.stdout),
-        format!("git-koi {}\n", env!("CARGO_PKG_VERSION"))
+        format!("git-dragon {}\n", env!("CARGO_PKG_VERSION"))
     );
 }
 
@@ -168,8 +168,8 @@ fn read_fixture_snapshot() -> AccountSnapshot {
     serde_json::from_str(&fs::read_to_string(HISTORY_FIXTURE).unwrap()).unwrap()
 }
 
-fn read_fixture_development() -> KoiDevelopment {
-    derive_koi_development(&read_fixture_snapshot()).unwrap()
+fn read_fixture_development() -> DragonDevelopment {
+    derive_dragon_development(&read_fixture_snapshot()).unwrap()
 }
 
 /// An empty directory of the given name under Cargo's scratch space for tests.
@@ -180,8 +180,8 @@ fn fresh_directory(directory_name: &str) -> PathBuf {
     directory_path
 }
 
-fn run_git_koi(arguments: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_git-koi"))
+fn run_git_dragon(arguments: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_git-dragon"))
         .args(arguments)
         .output()
         .unwrap()

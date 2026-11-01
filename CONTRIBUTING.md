@@ -9,13 +9,13 @@ change, and what a pull request looks like.
   [Cargo.toml](Cargo.toml). Install it with [rustup](https://rustup.rs).
 - Node.js, which runs Prettier for documentation and configuration files.
 - The [GitHub CLI](https://cli.github.com), authenticated, to run
-  `git-koi collect` against a real account.
+  `git-dragon collect` against a real account.
 
 ## Build
 
 ```sh
 cargo build --release --locked
-./target/release/git-koi --help
+./target/release/git-dragon --help
 ```
 
 `--locked` keeps `Cargo.lock` as committed.
@@ -48,17 +48,17 @@ npx prettier@3.9.10 --write .
 
 ## Reviewing Rendering Changes
 
-The koi library shows every body across growth samples, language mixes, and
+The dragon library shows every body across growth samples, language mixes, and
 streak marks, as transparent PNG and SVG pairs plus light and dark comparison
 sheets. Generate it from the repository root, then open `library/README.md`; Git
 ignores the generated files, and CI attaches a fresh library to every pull
-request as the `koi-library` artifact.
+request as the `dragon-library` artifact.
 
 ```sh
 cargo run --locked --example generate-library -- library
 ```
 
-When a change alters how the koi looks, copy `library/bodies-light.png` and
+When a change alters how the dragon looks, copy `library/bodies-light.png` and
 `library/bodies-dark.png` into `docs/` so the README's sheet matches the code.
 
 ## Releasing

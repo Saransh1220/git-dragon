@@ -1,7 +1,7 @@
 use chrono::{Days, NaiveDate};
-use git_koi::behavior::{Behavior, select_behavior};
-use git_koi::history::{AccountSnapshot, ContributionDay, ContributionHistory};
-use git_koi::koi::{KoiDevelopment, derive_koi_development};
+use git_dragon::behavior::{Behavior, select_behavior};
+use git_dragon::history::{AccountSnapshot, ContributionDay, ContributionHistory};
+use git_dragon::dragon::{DragonDevelopment, derive_dragon_development};
 
 #[test]
 fn quiet_days_bring_rest_then_deep_rest() {
@@ -160,7 +160,7 @@ fn quiet_days_change_behavior_only_at_the_thresholds_and_nothing_else() {
 }
 
 /// Daily counts from a Monday, observed on the last day.
-fn develop_from_daily_counts(daily_counts: &[u32]) -> KoiDevelopment {
+fn develop_from_daily_counts(daily_counts: &[u32]) -> DragonDevelopment {
     let first_monday: NaiveDate = "2025-01-06".parse().unwrap();
     let mut account_snapshot: AccountSnapshot =
         serde_json::from_str(include_str!("fixtures/account-with-history.json")).unwrap();
@@ -176,5 +176,5 @@ fn develop_from_daily_counts(daily_counts: &[u32]) -> KoiDevelopment {
         observed_on: contribution_days.last().unwrap().date,
         days: contribution_days,
     });
-    derive_koi_development(&account_snapshot).unwrap()
+    derive_dragon_development(&account_snapshot).unwrap()
 }

@@ -1,16 +1,16 @@
 use std::sync::OnceLock;
 
-use git_koi::behavior::Behavior;
-use git_koi::coat::KoiBody;
-use git_koi::history::AccountSnapshot;
-use git_koi::koi::derive_koi_development;
-use git_koi::output::{GifEncodingError, STATIC_HEIGHT_PIXELS, STATIC_WIDTH_PIXELS, encode_gif};
-use git_koi::render::{FRAME_WIDTH_PIXELS, KoiFrame, render_swim_frame};
+use git_dragon::behavior::Behavior;
+use git_dragon::coat::DragonBody;
+use git_dragon::history::AccountSnapshot;
+use git_dragon::dragon::derive_dragon_development;
+use git_dragon::output::{GifEncodingError, STATIC_HEIGHT_PIXELS, STATIC_WIDTH_PIXELS, encode_gif};
+use git_dragon::render::{FRAME_WIDTH_PIXELS, DragonFrame, render_flight_frame};
 
 #[test]
 fn the_gif_rebuilds_every_frame_exactly_at_twice_the_size() {
-    let (koi_frames, gif_bytes) = encoded_feeding_excerpt();
-    assert_eq!(encode_gif(koi_frames).unwrap(), *gif_bytes);
+    let (dragon_frames, gif_bytes) = encoded_feeding_excerpt();
+    assert_eq!(encode_gif(dragon_frames).unwrap(), *gif_bytes);
     let mut gif_options = gif::DecodeOptions::new();
     gif_options.set_color_output(gif::ColorOutput::Indexed);
     let mut gif_decoder = gif_options.read_info(gif_bytes.as_slice()).unwrap();
@@ -24,7 +24,7 @@ fn the_gif_rebuilds_every_frame_exactly_at_twice_the_size() {
     // Composite the way a browser does: draw each frame's box over the canvas, show
     // the result, then apply the frame's disposal before the next one.
     let mut canvas = vec![[0; 4]; (STATIC_WIDTH_PIXELS * STATIC_HEIGHT_PIXELS) as usize];
-    for koi_frame in koi_frames {
+    for dragon_frame in dragon_frames {
         let gif_frame = gif_decoder.read_next_frame().unwrap().unwrap();
         let palette = gif_frame.palette.as_ref().unwrap();
         let box_pixels = |box_index: usize| {
@@ -41,7 +41,7 @@ fn the_gif_rebuilds_every_frame_exactly_at_twice_the_size() {
                 canvas[box_pixels(box_index)] = [red, green, blue, 255];
             }
         }
-        assert_eq!(canvas, scale_to_export(koi_frame));
+        assert_eq!(canvas, scale_to_export(dragon_frame));
         if gif_frame.dispose == gif::DisposalMethod::Background {
             for box_index in 0..gif_frame.buffer.len() {
                 canvas[box_pixels(box_index)] = [0; 4];
@@ -52,7 +52,7 @@ fn the_gif_rebuilds_every_frame_exactly_at_twice_the_size() {
 }
 
 #[test]
-fn frames_store_only_the_box_around_the_koi() {
+fn frames_store_only_the_box_around_the_dragon() {
     let mut gif_decoder = gif::DecodeOptions::new()
         .read_info(encoded_feeding_excerpt().1.as_slice())
         .unwrap();
@@ -82,30 +82,30 @@ fn an_empty_loop_is_an_error() {
 
 /// The first six frames of surface feeding, which draws the mouth, ripples, and pellets,
 /// and their GIF, rendered once for every test.
-fn encoded_feeding_excerpt() -> &'static (Vec<KoiFrame>, Vec<u8>) {
-    static FEEDING_EXCERPT: OnceLock<(Vec<KoiFrame>, Vec<u8>)> = OnceLock::new();
+fn encoded_feeding_excerpt() -> &'static (Vec<DragonFrame>, Vec<u8>) {
+    static FEEDING_EXCERPT: OnceLock<(Vec<DragonFrame>, Vec<u8>)> = OnceLock::new();
     FEEDING_EXCERPT.get_or_init(|| {
         let account_snapshot: AccountSnapshot =
             serde_json::from_str(include_str!("fixtures/account-with-history.json")).unwrap();
-        let koi_development = derive_koi_development(&account_snapshot).unwrap();
-        let koi_frames: Vec<KoiFrame> = (0..6)
+        let dragon_development = derive_dragon_development(&account_snapshot).unwrap();
+        let dragon_frames: Vec<DragonFrame> = (0..6)
             .map(|frame_index| {
-                render_swim_frame(
-                    &koi_development,
-                    KoiBody::default(),
+                render_flight_frame(
+                    &dragon_development,
+                    DragonBody::default(),
                     Behavior::SurfaceFeeding,
                     frame_index,
                 )
             })
             .collect();
-        let gif_bytes = encode_gif(&koi_frames).unwrap();
-        (koi_frames, gif_bytes)
+        let gif_bytes = encode_gif(&dragon_frames).unwrap();
+        (dragon_frames, gif_bytes)
     })
 }
 
 /// Repeat each native pixel twice in both dimensions, as the export does.
-fn scale_to_export(koi_frame: &KoiFrame) -> Vec<[u8; 4]> {
-    let native_pixels = koi_frame.as_rgba_bytes().as_chunks::<4>().0;
+fn scale_to_export(dragon_frame: &DragonFrame) -> Vec<[u8; 4]> {
+    let native_pixels = dragon_frame.as_rgba_bytes().as_chunks::<4>().0;
     (0..STATIC_WIDTH_PIXELS * STATIC_HEIGHT_PIXELS)
         .map(|export_index| {
             let native_x = export_index % STATIC_WIDTH_PIXELS / 2;

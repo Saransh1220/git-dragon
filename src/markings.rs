@@ -1,6 +1,6 @@
-//! How strongly the current and longest streaks show on the koi.
+//! How strongly the current and longest streaks show on the dragon.
 
-use crate::koi::{KoiDevelopment, RecentStreak};
+use crate::dragon::{DragonDevelopment, RecentStreak};
 
 const STREAK_FIN_FULL_WEEKS: f64 = 13.0;
 const FADE_RATE_PER_WEEK: f64 = 0.5;
@@ -33,8 +33,8 @@ pub struct StreakMarks {
 /// normal by NORMAL_COLOR_WEEKS and to vivid by VIVID_COLOR_WEEKS, then glimmer
 /// builds until FULL_GLIMMER_WEEKS. The longest streak never shrinks, so neither do
 /// these marks. This reads no clock.
-pub fn calculate_streak_marks(koi_development: &KoiDevelopment) -> StreakMarks {
-    let streak_fin_strength = match &koi_development.streaks.recent {
+pub fn calculate_streak_marks(dragon_development: &DragonDevelopment) -> StreakMarks {
+    let streak_fin_strength = match &dragon_development.streaks.recent {
         None => 0.0,
         Some(RecentStreak::Current(streak_weeks)) => calculate_fin_build(streak_weeks.len()),
         Some(RecentStreak::Ended {
@@ -42,11 +42,11 @@ pub fn calculate_streak_marks(koi_development: &KoiDevelopment) -> StreakMarks {
             ended_on,
         }) => {
             let weeks_since_end =
-                (koi_development.observed_on - *ended_on).num_days().max(0) as f64 / 7.0;
+                (dragon_development.observed_on - *ended_on).num_days().max(0) as f64 / 7.0;
             calculate_fin_build(streak_weeks.len()) * calculate_fade(weeks_since_end)
         }
     };
-    let record_strength = calculate_record_strength(koi_development.streaks.longest.len() as f64);
+    let record_strength = calculate_record_strength(dragon_development.streaks.longest.len() as f64);
     let normal_strength = calculate_record_strength(NORMAL_COLOR_WEEKS);
     let vivid_strength = calculate_record_strength(VIVID_COLOR_WEEKS);
     let color_vibrancy = if record_strength < normal_strength {

@@ -1,19 +1,19 @@
 use std::collections::BTreeMap;
 
 use chrono::{Days, NaiveDate};
-use git_koi::history::{
+use git_dragon::history::{
     AccountSnapshot, ConflictingRepository, ContributionDay, ContributionHistory,
     ContributionHistoryError, LanguageColor,
 };
-use git_koi::koi::{KoiDevelopmentError, RecentActivity, RecentStreak, derive_koi_development};
+use git_dragon::dragon::{DragonDevelopmentError, RecentActivity, RecentStreak, derive_dragon_development};
 
 #[test]
 fn identity_survives_growth_and_language_changes_but_distinguishes_accounts() {
     let mut account_snapshot = build_snapshot_with_counts(&[1; 7]);
-    let original_development = derive_koi_development(&account_snapshot).unwrap();
+    let original_development = derive_dragon_development(&account_snapshot).unwrap();
     account_snapshot.repositories.clear();
     account_snapshot.contribution_history.as_mut().unwrap().days[0].contribution_count += 5;
-    let changed_development = derive_koi_development(&account_snapshot).unwrap();
+    let changed_development = derive_dragon_development(&account_snapshot).unwrap();
     assert_eq!(
         changed_development.identity_seed,
         original_development.identity_seed
@@ -28,7 +28,7 @@ fn identity_survives_growth_and_language_changes_but_distinguishes_accounts() {
     );
     account_snapshot.account_id += 1;
     assert_ne!(
-        derive_koi_development(&account_snapshot)
+        derive_dragon_development(&account_snapshot)
             .unwrap()
             .identity_seed,
         original_development.identity_seed
@@ -38,7 +38,7 @@ fn identity_survives_growth_and_language_changes_but_distinguishes_accounts() {
 #[test]
 fn development_is_reproducible_after_reordering_and_duplicate_observations() {
     let mut account_snapshot = build_snapshot_with_counts(&[1; 15]);
-    let original_development = derive_koi_development(&account_snapshot).unwrap();
+    let original_development = derive_dragon_development(&account_snapshot).unwrap();
     account_snapshot
         .repositories
         .push(account_snapshot.repositories[0].clone());
@@ -47,7 +47,7 @@ fn development_is_reproducible_after_reordering_and_duplicate_observations() {
     contribution_days.push(contribution_days[0].clone());
     contribution_days.reverse();
     assert_eq!(
-        derive_koi_development(&account_snapshot).unwrap(),
+        derive_dragon_development(&account_snapshot).unwrap(),
         original_development
     );
 }
@@ -58,10 +58,10 @@ fn twelve_week_streaks_retain_different_participation_with_equal_totals() {
         [([1, 1, 1, 1, 1, 0, 0], 5), ([0, 0, 0, 0, 0, 5, 0], 1)]
     {
         let account_snapshot = build_snapshot_with_counts(&weekly_counts.repeat(12));
-        let koi_development = derive_koi_development(&account_snapshot).unwrap();
-        assert_eq!(koi_development.total_contributions, 60);
+        let dragon_development = derive_dragon_development(&account_snapshot).unwrap();
+        assert_eq!(dragon_development.total_contributions, 60);
         assert_eq!(
-            koi_development
+            dragon_development
                 .streaks
                 .longest
                 .iter()
@@ -70,8 +70,8 @@ fn twelve_week_streaks_retain_different_participation_with_equal_totals() {
             vec![expected_active_days; 12]
         );
         assert_eq!(
-            koi_development.streaks.recent,
-            Some(RecentStreak::Current(koi_development.streaks.longest))
+            dragon_development.streaks.recent,
+            Some(RecentStreak::Current(dragon_development.streaks.longest))
         );
     }
 }
@@ -81,7 +81,7 @@ fn inactive_weeks_end_the_current_streak_without_erasing_or_restarting_it() {
     let mut daily_counts = vec![1; 7];
     daily_counts.extend([0; 7]);
     let unfinished_week_development =
-        derive_koi_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
+        derive_dragon_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
     assert_eq!(
         unfinished_week_development.streaks.recent,
         Some(RecentStreak::Current(
@@ -90,7 +90,7 @@ fn inactive_weeks_end_the_current_streak_without_erasing_or_restarting_it() {
     );
     daily_counts.push(0);
     let ended_development =
-        derive_koi_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
+        derive_dragon_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
     assert_eq!(
         ended_development.streaks.longest,
         unfinished_week_development.streaks.longest
@@ -104,7 +104,7 @@ fn inactive_weeks_end_the_current_streak_without_erasing_or_restarting_it() {
     );
     daily_counts.extend([0; 14]);
     let quiet_development =
-        derive_koi_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
+        derive_dragon_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
     assert_eq!(quiet_development.streaks, ended_development.streaks);
     assert_eq!(
         quiet_development.total_contributions,
@@ -120,14 +120,14 @@ fn returning_streak_changes_the_record_only_after_strictly_beating_it() {
     for (expected_current_weeks, expected_record_days) in
         [(1, &[7, 7][..]), (2, &[7, 7][..]), (3, &[1, 1, 1][..])]
     {
-        let koi_development =
-            derive_koi_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
-        let Some(RecentStreak::Current(current_weeks)) = koi_development.streaks.recent else {
+        let dragon_development =
+            derive_dragon_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
+        let Some(RecentStreak::Current(current_weeks)) = dragon_development.streaks.recent else {
             panic!("returning activity must produce a current streak");
         };
         assert_eq!(current_weeks.len(), expected_current_weeks);
         assert_eq!(
-            koi_development
+            dragon_development
                 .streaks
                 .longest
                 .iter()
@@ -146,13 +146,13 @@ fn a_shorter_ended_streak_remains_available_alongside_the_permanent_record() {
     daily_counts.extend([0; 7]);
     daily_counts.push(1);
     daily_counts.extend([0; 14]);
-    let koi_development =
-        derive_koi_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
-    assert_eq!(koi_development.streaks.longest.len(), 2);
+    let dragon_development =
+        derive_dragon_development(&build_snapshot_with_counts(&daily_counts)).unwrap();
+    assert_eq!(dragon_development.streaks.longest.len(), 2);
     let Some(RecentStreak::Ended {
         weeks: ended_weeks,
         ended_on,
-    }) = koi_development.streaks.recent
+    }) = dragon_development.streaks.recent
     else {
         panic!("the latest shorter streak must remain available for fading");
     };
@@ -164,7 +164,7 @@ fn a_shorter_ended_streak_remains_available_alongside_the_permanent_record() {
 #[test]
 fn empty_observations_produce_no_streaks_but_unavailable_history_fails() {
     let mut account_snapshot = build_snapshot_with_counts(&[0; 14]);
-    let inactive_development = derive_koi_development(&account_snapshot).unwrap();
+    let inactive_development = derive_dragon_development(&account_snapshot).unwrap();
     assert_eq!(inactive_development.total_contributions, 0);
     assert!(inactive_development.streaks.longest.is_empty());
     assert!(inactive_development.streaks.recent.is_none());
@@ -175,13 +175,13 @@ fn empty_observations_produce_no_streaks_but_unavailable_history_fails() {
         .days
         .clear();
     // Observed quiet days are recent activity; an empty history has none to report.
-    let empty_development = derive_koi_development(&account_snapshot).unwrap();
+    let empty_development = derive_dragon_development(&account_snapshot).unwrap();
     assert_eq!(empty_development.total_contributions, 0);
     assert_eq!(empty_development.streaks, inactive_development.streaks);
     account_snapshot.contribution_history = None;
     assert_eq!(
-        derive_koi_development(&account_snapshot),
-        Err(KoiDevelopmentError::ContributionHistory(
+        derive_dragon_development(&account_snapshot),
+        Err(DragonDevelopmentError::ContributionHistory(
             ContributionHistoryError::MissingHistory
         ))
     );
@@ -197,8 +197,8 @@ fn conflicting_repositories_cannot_produce_a_partial_development_model() {
     };
     account_snapshot.repositories.push(conflicting_repository);
     assert_eq!(
-        derive_koi_development(&account_snapshot),
-        Err(KoiDevelopmentError::Repositories(expected_error))
+        derive_dragon_development(&account_snapshot),
+        Err(DragonDevelopmentError::Repositories(expected_error))
     );
 }
 
@@ -209,7 +209,7 @@ fn development_carries_the_color_of_each_counted_language() {
     recorded_colors.insert("C++".to_owned(), None);
     recorded_colors.insert("Go".to_owned(), Some(LanguageColor([0x00, 0xad, 0xd8])));
     assert_eq!(
-        derive_koi_development(&account_snapshot)
+        derive_dragon_development(&account_snapshot)
             .unwrap()
             .language_colors,
         BTreeMap::from([
@@ -229,29 +229,29 @@ fn snapshots_without_language_colors_ask_for_a_new_collection() {
         .unwrap()
         .remove("Python");
     assert_eq!(
-        derive_koi_development(&account_snapshot),
-        Err(KoiDevelopmentError::MissingLanguageColor(
+        derive_dragon_development(&account_snapshot),
+        Err(DragonDevelopmentError::MissingLanguageColor(
             "Python".to_owned()
         ))
     );
     account_snapshot.language_colors = None;
-    let missing_colors = derive_koi_development(&account_snapshot);
+    let missing_colors = derive_dragon_development(&account_snapshot);
     assert_eq!(
         missing_colors,
-        Err(KoiDevelopmentError::MissingLanguageColors)
+        Err(DragonDevelopmentError::MissingLanguageColors)
     );
     assert!(
         missing_colors
             .unwrap_err()
             .to_string()
-            .contains("git-koi collect")
+            .contains("git-dragon collect")
     );
 }
 
 #[test]
 fn recent_activity_counts_quiet_days_the_last_week_and_complete_weeks() {
     let activity_for = |daily_counts: &[u32]| {
-        derive_koi_development(&build_snapshot_with_counts(daily_counts))
+        derive_dragon_development(&build_snapshot_with_counts(daily_counts))
             .unwrap()
             .recent_activity
     };
@@ -295,7 +295,7 @@ fn recent_activity_counts_quiet_days_the_last_week_and_complete_weeks() {
         .days
         .clear();
     assert_eq!(
-        derive_koi_development(&empty_snapshot)
+        derive_dragon_development(&empty_snapshot)
             .unwrap()
             .recent_activity,
         RecentActivity {

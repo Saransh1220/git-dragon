@@ -1,19 +1,19 @@
 //! The day's movement, chosen from recent activity by one ordered set of rules.
 
-use crate::koi::{KoiDevelopment, RecentActivity};
+use crate::dragon::{DragonDevelopment, RecentActivity};
 
 /// One movement per run.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Behavior {
-    /// Sits low in the water, blue-tinted, barely moving.
+    /// Sleeps with the wings folded, moonlit blue, barely moving.
     DeepRest,
-    /// Hovers in place a little deeper, with a slow beat and glide.
+    /// Hovers lower with lazy wing beats.
     Rest,
-    /// Hovers at the surface and gulps.
+    /// Hovers and breathes fire.
     SurfaceFeeding,
-    /// Two fast laps of strong bursts and glides.
+    /// Fast, hard wing beats with a forward surge.
     Dart,
-    /// One slow lap; the everyday swim.
+    /// Slow, steady wing beats; the everyday flight.
     Cruise,
 }
 
@@ -30,7 +30,7 @@ const DART_WEEK_SHARE_DENOMINATOR: usize = 10;
 const DAYS_PER_WEEK: usize = 7;
 
 /// Choose the movement for the day after the observation date. A nightly run judges
-/// the day that just ended, and the koi shows the result all of the next day. The
+/// the day that just ended, and the dragon shows the result all of the next day. The
 /// first matching rule wins:
 ///
 /// | Behavior | When the observation date |
@@ -45,17 +45,17 @@ const DAYS_PER_WEEK: usize = 7;
 /// A finished week is busy when at most one in ten of the latest
 /// DART_COMPARED_WEEKS complete weeks before it match or beat its total, and at
 /// least DART_MIN_COMPLETE_WEEKS weeks are compared. So a steady account cruises,
-/// and the koi darts at most one day a week beyond milestones. This reads no clock
+/// and the dragon darts at most one day a week beyond milestones. This reads no clock
 /// and changes no growth, colors, or marks.
-pub fn select_behavior(koi_development: &KoiDevelopment) -> Behavior {
-    let recent_activity = &koi_development.recent_activity;
+pub fn select_behavior(dragon_development: &DragonDevelopment) -> Behavior {
+    let recent_activity = &dragon_development.recent_activity;
     if recent_activity.quiet_day_count >= DEEP_REST_QUIET_DAYS {
         Behavior::DeepRest
     } else if recent_activity.quiet_day_count >= REST_QUIET_DAYS {
         Behavior::Rest
     } else if is_first_contribution_of_week(recent_activity) {
         Behavior::SurfaceFeeding
-    } else if has_crossed_milestone(koi_development.total_contributions, recent_activity)
+    } else if has_crossed_milestone(dragon_development.total_contributions, recent_activity)
         || is_finished_busy_week(recent_activity)
     {
         Behavior::Dart

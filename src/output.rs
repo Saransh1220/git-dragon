@@ -12,7 +12,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::motion::FRAMES_PER_SECOND;
-use crate::render::{FRAME_HEIGHT_PIXELS, FRAME_WIDTH_PIXELS, KoiFrame};
+use crate::render::{FRAME_HEIGHT_PIXELS, FRAME_WIDTH_PIXELS, DragonFrame};
 
 /// Each native pixel becomes this many export pixels on each side.
 pub const STATIC_EXPORT_SCALE: u32 = 2;
@@ -24,8 +24,8 @@ pub const STATIC_HEIGHT_PIXELS: u32 = FRAME_HEIGHT_PIXELS * STATIC_EXPORT_SCALE;
 /// Encode a static PNG by repeating each native pixel in both dimensions.
 /// Preserve its color and alpha without interpolation, timestamps, I/O, or mutation.
 /// Encoding errors propagate before the caller publishes any resulting bytes.
-pub fn encode_png(koi_frame: &KoiFrame) -> Result<Vec<u8>, png::EncodingError> {
-    let native_pixels = koi_frame.as_rgba_bytes().as_chunks::<4>().0;
+pub fn encode_png(dragon_frame: &DragonFrame) -> Result<Vec<u8>, png::EncodingError> {
+    let native_pixels = dragon_frame.as_rgba_bytes().as_chunks::<4>().0;
     let mut export_pixels = vec![[0; 4]; (STATIC_WIDTH_PIXELS * STATIC_HEIGHT_PIXELS) as usize];
     for (pixel_index, pixel_channels) in export_pixels.iter_mut().enumerate() {
         let native_x = pixel_index as u32 % STATIC_WIDTH_PIXELS / STATIC_EXPORT_SCALE;
@@ -47,11 +47,11 @@ pub fn encode_png(koi_frame: &KoiFrame) -> Result<Vec<u8>, png::EncodingError> {
 /// Equal neighboring pixels share a rectangle within their row. Transparent pixels
 /// are omitted; visible pixels retain their color and alpha. Identical frames produce
 /// identical documents without I/O, timestamps, external assets, or input mutation.
-pub fn encode_svg(koi_frame: &KoiFrame) -> String {
+pub fn encode_svg(dragon_frame: &DragonFrame) -> String {
     let mut svg_document = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{STATIC_WIDTH_PIXELS}\" height=\"{STATIC_HEIGHT_PIXELS}\" viewBox=\"0 0 {FRAME_WIDTH_PIXELS} {FRAME_HEIGHT_PIXELS}\" shape-rendering=\"crispEdges\">\n"
     );
-    let native_pixels = koi_frame.as_rgba_bytes().as_chunks::<4>().0;
+    let native_pixels = dragon_frame.as_rgba_bytes().as_chunks::<4>().0;
     let mut pixel_index = 0;
     while pixel_index < native_pixels.len() {
         let pixel_channels = native_pixels[pixel_index];
@@ -81,7 +81,7 @@ const PREVIEW_HEAD: &str = r#"<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>git-koi preview</title>
+<title>git-dragon preview</title>
 <style>
   body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
   h1, h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -99,22 +99,22 @@ const PREVIEW_PANELS: &str = r#"</h1></header>
 <section class="light">
 <h2>GitHub light</h2>
 <div class="images">
-<figure><img src="koi.gif" width="512" height="512" alt="The koi swimming"><figcaption>koi.gif</figcaption></figure>
-<figure><img src="koi.png" width="512" height="512" alt="The koi, still"><figcaption>koi.png</figcaption></figure>
+<figure><img src="dragon.gif" width="512" height="512" alt="The dragon flying"><figcaption>dragon.gif</figcaption></figure>
+<figure><img src="dragon.png" width="512" height="512" alt="The dragon, still"><figcaption>dragon.png</figcaption></figure>
 </div>
 </section>
 <section class="dark">
 <h2>GitHub dark</h2>
 <div class="images">
-<figure><img src="koi.gif" width="512" height="512" alt="The koi swimming"><figcaption>koi.gif</figcaption></figure>
-<figure><img src="koi.png" width="512" height="512" alt="The koi, still"><figcaption>koi.png</figcaption></figure>
+<figure><img src="dragon.gif" width="512" height="512" alt="The dragon flying"><figcaption>dragon.gif</figcaption></figure>
+<figure><img src="dragon.png" width="512" height="512" alt="The dragon, still"><figcaption>dragon.png</figcaption></figure>
 </div>
 </section>
 </body>
 </html>
 "#;
 
-/// Build a page that previews `koi.gif` and `koi.png`, read from beside it, on GitHub's
+/// Build a page that previews `dragon.gif` and `dragon.png`, read from beside it, on GitHub's
 /// light and dark page colors under the given caption. It draws nothing itself and loads
 /// no scripts or outside files, so it shows exactly what was generated.
 pub fn encode_preview_html(caption: &str) -> String {
@@ -137,8 +137,8 @@ const GIF_TRANSPARENT_INDEX: u8 = 0;
 /// before the next frame. Colors are never approximated: a frame with more than 255
 /// colors or a partly transparent pixel fails instead. Identical frames produce
 /// identical bytes without I/O, timestamps, or input mutation.
-pub fn encode_gif(koi_frames: &[KoiFrame]) -> Result<Vec<u8>, GifEncodingError> {
-    if koi_frames.is_empty() {
+pub fn encode_gif(dragon_frames: &[DragonFrame]) -> Result<Vec<u8>, GifEncodingError> {
+    if dragon_frames.is_empty() {
         return Err(GifEncodingError::NoFrames);
     }
     let mut gif_encoder = gif::Encoder::new(
@@ -148,8 +148,8 @@ pub fn encode_gif(koi_frames: &[KoiFrame]) -> Result<Vec<u8>, GifEncodingError> 
         &[],
     )?;
     gif_encoder.set_repeat(gif::Repeat::Infinite)?;
-    for (frame_index, koi_frame) in koi_frames.iter().enumerate() {
-        let native_pixels = koi_frame.as_rgba_bytes().as_chunks::<4>().0;
+    for (frame_index, dragon_frame) in dragon_frames.iter().enumerate() {
+        let native_pixels = dragon_frame.as_rgba_bytes().as_chunks::<4>().0;
         let [box_left, box_top, box_width, box_height] = find_drawn_box(native_pixels);
         let mut palette_indices: BTreeMap<[u8; 3], u8> = BTreeMap::new();
         let mut palette_channels = vec![0; 3];
@@ -295,12 +295,12 @@ mod tests {
     const FRAME_PIXEL_COUNT: usize = (FRAME_WIDTH_PIXELS * FRAME_HEIGHT_PIXELS) as usize;
 
     /// A frame with one opaque pixel of each given color, in reading order.
-    fn frame_with_colors(colors: impl IntoIterator<Item = [u8; 4]>) -> KoiFrame {
+    fn frame_with_colors(colors: impl IntoIterator<Item = [u8; 4]>) -> DragonFrame {
         let mut rgba_pixels = vec![[0; 4]; FRAME_PIXEL_COUNT];
         for (pixel_channels, color) in rgba_pixels.iter_mut().zip(colors) {
             *pixel_channels = color;
         }
-        KoiFrame::from_rgba_pixels(rgba_pixels)
+        DragonFrame::from_rgba_pixels(rgba_pixels)
     }
 
     fn distinct_colors(color_count: u32) -> impl Iterator<Item = [u8; 4]> {
@@ -319,11 +319,11 @@ mod tests {
     #[test]
     fn whole_loops_last_exactly_their_frames_at_fifteen_per_second() {
         for (loop_frame_count, loop_hundredths) in [(120, 800), (90, 600)] {
-            let koi_frames: Vec<KoiFrame> = (0..loop_frame_count)
+            let dragon_frames: Vec<DragonFrame> = (0..loop_frame_count)
                 .map(|_| frame_with_colors(distinct_colors(1)))
                 .collect();
             assert_eq!(
-                total_hundredths(&encode_gif(&koi_frames).unwrap()),
+                total_hundredths(&encode_gif(&dragon_frames).unwrap()),
                 loop_hundredths
             );
         }

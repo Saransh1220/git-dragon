@@ -63,16 +63,16 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           ARCHIVE_STEM:
-            git-koi-${{ needs.verify.outputs.version }}-${{ matrix.target }}
+            git-dragon-${{ needs.verify.outputs.version }}-${{ matrix.target }}
         run: |
           mkdir "$ARCHIVE_STEM"
           cp LICENSE README.md CHANGELOG.md "$ARCHIVE_STEM"/
           if [[ "$TARGET" == *windows* ]]; then
-            cp "target/$TARGET/release/git-koi.exe" "$ARCHIVE_STEM"/
+            cp "target/$TARGET/release/git-dragon.exe" "$ARCHIVE_STEM"/
             archive="$ARCHIVE_STEM.zip"
             7z a -tzip "$archive" "$ARCHIVE_STEM" > /dev/null
           else
-            cp "target/$TARGET/release/git-koi" "$ARCHIVE_STEM"/
+            cp "target/$TARGET/release/git-dragon" "$ARCHIVE_STEM"/
             archive="$ARCHIVE_STEM.tar.gz"
             tar -czf "$archive" "$ARCHIVE_STEM"
           fi
@@ -85,9 +85,9 @@ jobs:
         with:
           name: ${{ matrix.target }}
           path: |
-            git-koi-*.tar.gz
-            git-koi-*.zip
-            git-koi-*.sha256
+            git-dragon-*.tar.gz
+            git-dragon-*.zip
+            git-dragon-*.sha256
           if-no-files-found: error
 
   release:
@@ -129,11 +129,11 @@ jobs:
           persist-credentials: false
       - uses: ./
         with:
-          output-dir: koi-output
+          output-dir: dragon-output
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: koi
-          path: koi-output/
+          name: dragon
+          path: dragon-output/
           if-no-files-found: error
 
   publish:
@@ -161,8 +161,8 @@ jobs:
       - name: Check whether crates.io already has this version
         id: crates_io
         run: |
-          crate_url="https://crates.io/api/v1/crates/git-koi/$VERSION"
-          if curl -fsS -A "git-koi release workflow" "$crate_url" > /dev/null; then
+          crate_url="https://crates.io/api/v1/crates/git-dragon/$VERSION"
+          if curl -fsS -A "git-dragon release workflow" "$crate_url" > /dev/null; then
             echo "published=true" >> "$GITHUB_OUTPUT"
           else
             echo "published=false" >> "$GITHUB_OUTPUT"

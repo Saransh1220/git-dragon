@@ -75,8 +75,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-koi"
-version = "1.0.2"
+name = "git-dragon"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "gif",

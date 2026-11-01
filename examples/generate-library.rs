@@ -1,16 +1,16 @@
 use std::{env, error::Error, fs, path::Path, process::ExitCode};
 
 use chrono::{Datelike, Days, NaiveDate};
-use git_koi::coat::KoiBody;
-use git_koi::history::{AccountSnapshot, ContributionWeek, LanguageColor};
-use git_koi::koi::{
-    ADULT_CONTRIBUTIONS, KoiDevelopment, MAX_GROWTH_CONTRIBUTIONS, RecentStreak,
-    YOUNG_SHAPE_CONTRIBUTIONS, derive_koi_development,
+use git_dragon::coat::DragonBody;
+use git_dragon::history::{AccountSnapshot, ContributionWeek, LanguageColor};
+use git_dragon::dragon::{
+    ADULT_CONTRIBUTIONS, DragonDevelopment, MAX_GROWTH_CONTRIBUTIONS, RecentStreak,
+    YOUNG_SHAPE_CONTRIBUTIONS, derive_dragon_development,
 };
-use git_koi::output::{
+use git_dragon::output::{
     STATIC_EXPORT_SCALE, STATIC_HEIGHT_PIXELS, STATIC_WIDTH_PIXELS, encode_png, encode_svg,
 };
-use git_koi::render::{FRAME_HEIGHT_PIXELS, FRAME_WIDTH_PIXELS, KoiFrame, render_koi};
+use git_dragon::render::{FRAME_HEIGHT_PIXELS, FRAME_WIDTH_PIXELS, DragonFrame, render_dragon};
 
 /// Language mixes with GitHub's colors and their shares of the account's projects.
 type LanguageMix = &'static [(&'static str, &'static str, f64)];
@@ -46,13 +46,13 @@ const BODY_MIX: LanguageMix = &[
     ("Rust", "#dea584", 0.2),
     ("Python", "#3572a5", 0.2),
 ];
-const BODY_SAMPLES: [(&str, KoiBody); 6] = [
-    ("white", KoiBody::White),
-    ("black", KoiBody::Black),
-    ("asagi", KoiBody::Asagi),
-    ("tea", KoiBody::Tea),
-    ("gold", KoiBody::Gold),
-    ("platinum", KoiBody::Platinum),
+const BODY_SAMPLES: [(&str, DragonBody); 6] = [
+    ("emerald", DragonBody::Emerald),
+    ("obsidian", DragonBody::Obsidian),
+    ("azure", DragonBody::Azure),
+    ("crimson", DragonBody::Crimson),
+    ("gold", DragonBody::Gold),
+    ("silver", DragonBody::Silver),
 ];
 /// A recent streak sample: still running, or ended some days before the observation.
 #[derive(Clone, Copy)]
@@ -125,61 +125,61 @@ fn main() -> ExitCode {
 fn generate_library(output_directory: &Path) -> Result<(), Box<dyn Error>> {
     let account_snapshot: AccountSnapshot =
         serde_json::from_str(include_str!("../tests/fixtures/account-with-history.json"))?;
-    let mut koi_development = derive_koi_development(&account_snapshot)?;
+    let mut dragon_development = derive_dragon_development(&account_snapshot)?;
     // Growth samples show normal colors and no streak fins.
-    set_streaks(&mut koi_development, 4, Some(ended_long_ago(4)));
-    let mut index_markdown = build_index_header(koi_development.identity_seed);
+    set_streaks(&mut dragon_development, 4, Some(ended_long_ago(4)));
+    let mut index_markdown = build_index_header(dragon_development.identity_seed);
     fs::create_dir_all(output_directory)?;
     let mut mix_frames = Vec::new();
     for (mix_name, language_mix) in LANGUAGE_SAMPLES {
-        let mix_description = apply_language_mix(&mut koi_development, language_mix)?;
+        let mix_description = apply_language_mix(&mut dragon_development, language_mix)?;
         index_markdown.push_str(&format!(
             "## {}\n\n{mix_description}.\n\n",
             capitalize(mix_name)
         ));
         mix_frames.extend(render_growth_samples(
             output_directory,
-            &mut koi_development,
-            KoiBody::default(),
+            &mut dragon_development,
+            DragonBody::default(),
             mix_name,
             &mut index_markdown,
         )?);
     }
     write_overviews(output_directory, "overview", &mix_frames)?;
-    let body_mix_description = apply_language_mix(&mut koi_development, BODY_MIX)?;
+    let body_mix_description = apply_language_mix(&mut dragon_development, BODY_MIX)?;
     let mut body_frames = Vec::new();
-    for (body_name, koi_body) in BODY_SAMPLES {
+    for (body_name, dragon_body) in BODY_SAMPLES {
         index_markdown.push_str(&format!(
             "## {} Body\n\n{body_mix_description}.\n\n",
             capitalize(body_name)
         ));
         body_frames.extend(render_growth_samples(
             output_directory,
-            &mut koi_development,
-            koi_body,
+            &mut dragon_development,
+            dragon_body,
             &format!("body-{body_name}"),
             &mut index_markdown,
         )?);
     }
     write_overviews(output_directory, "bodies", &body_frames)?;
     let mut marking_frames = Vec::new();
-    koi_development.total_contributions = ADULT_CONTRIBUTIONS;
-    let marking_mix_description = apply_language_mix(&mut koi_development, LANGUAGE_SAMPLES[3].1)?;
+    dragon_development.total_contributions = ADULT_CONTRIBUTIONS;
+    let marking_mix_description = apply_language_mix(&mut dragon_development, LANGUAGE_SAMPLES[3].1)?;
     index_markdown.push_str(&format!(
         "## Streak Markings\n\n{marking_mix_description}, at {ADULT_CONTRIBUTIONS} contributions.\n\n"
     ));
     for (sample_name, longest_week_count, recent_sample) in MARKING_SAMPLES {
-        set_streaks(&mut koi_development, longest_week_count, recent_sample);
+        set_streaks(&mut dragon_development, longest_week_count, recent_sample);
         marking_frames.push(render_sample(
             output_directory,
-            &koi_development,
-            KoiBody::default(),
+            &dragon_development,
+            DragonBody::default(),
             &format!("marks-{sample_name}"),
             &capitalize(&sample_name.replace('-', " ")),
             &mut index_markdown,
         )?);
     }
-    apply_language_mix(&mut koi_development, BODY_MIX)?;
+    apply_language_mix(&mut dragon_development, BODY_MIX)?;
     index_markdown.push_str(&format!(
         "## Bodies With and Without Marks\n\n{body_mix_description}, at \
         {ADULT_CONTRIBUTIONS} contributions. Without marks, no streak has happened yet; \
@@ -189,12 +189,12 @@ fn generate_library(output_directory: &Path) -> Result<(), Box<dyn Error>> {
         ("unmarked", 0, None),
         ("marked", 208, Some(RecentSample::Current { weeks: 13 })),
     ] {
-        set_streaks(&mut koi_development, longest_week_count, recent_sample);
-        for (body_name, koi_body) in BODY_SAMPLES {
+        set_streaks(&mut dragon_development, longest_week_count, recent_sample);
+        for (body_name, dragon_body) in BODY_SAMPLES {
             marking_frames.push(render_sample(
                 output_directory,
-                &koi_development,
-                koi_body,
+                &dragon_development,
+                dragon_body,
                 &format!("marks-{mark_name}-{body_name}"),
                 &format!("{} Body, {}", capitalize(body_name), capitalize(mark_name)),
                 &mut index_markdown,
@@ -212,17 +212,17 @@ fn generate_library(output_directory: &Path) -> Result<(), Box<dyn Error>> {
 
 /// Replace the development's languages with a sample mix and describe it for the index.
 fn apply_language_mix(
-    koi_development: &mut KoiDevelopment,
+    dragon_development: &mut DragonDevelopment,
     language_mix: LanguageMix,
 ) -> Result<String, Box<dyn Error>> {
-    koi_development.language_shares.clear();
-    koi_development.language_colors.clear();
+    dragon_development.language_shares.clear();
+    dragon_development.language_colors.clear();
     let mut mix_description = Vec::new();
     for &(language_name, color_text, language_share) in language_mix {
-        koi_development
+        dragon_development
             .language_shares
             .insert(language_name.to_owned(), language_share);
-        koi_development.language_colors.insert(
+        dragon_development.language_colors.insert(
             language_name.to_owned(),
             Some(LanguageColor::try_from(color_text)?),
         );
@@ -236,19 +236,19 @@ fn apply_language_mix(
 
 /// Replace the development's streaks with a sample longest and recent streak.
 fn set_streaks(
-    koi_development: &mut KoiDevelopment,
+    dragon_development: &mut DragonDevelopment,
     longest_week_count: usize,
     recent_sample: Option<RecentSample>,
 ) {
-    koi_development.streaks.longest = build_weeks(longest_week_count);
-    koi_development.streaks.recent = recent_sample.map(|recent_sample| match recent_sample {
+    dragon_development.streaks.longest = build_weeks(longest_week_count);
+    dragon_development.streaks.recent = recent_sample.map(|recent_sample| match recent_sample {
         RecentSample::Current { weeks } => RecentStreak::Current(build_weeks(weeks)),
         RecentSample::Ended {
             weeks,
             days_since_end,
         } => RecentStreak::Ended {
             weeks: build_weeks(weeks),
-            ended_on: koi_development.observed_on - Days::new(days_since_end),
+            ended_on: dragon_development.observed_on - Days::new(days_since_end),
         },
     });
 }
@@ -284,18 +284,18 @@ fn build_weeks(week_count: usize) -> Vec<ContributionWeek> {
 /// Render and write one sample per growth total, and list them in the index.
 fn render_growth_samples(
     output_directory: &Path,
-    koi_development: &mut KoiDevelopment,
-    koi_body: KoiBody,
+    dragon_development: &mut DragonDevelopment,
+    dragon_body: DragonBody,
     sample_name: &str,
     index_markdown: &mut String,
-) -> Result<Vec<KoiFrame>, Box<dyn Error>> {
+) -> Result<Vec<DragonFrame>, Box<dyn Error>> {
     let mut rendered_frames = Vec::new();
     for contribution_total in GROWTH_SAMPLES {
-        koi_development.total_contributions = contribution_total;
+        dragon_development.total_contributions = contribution_total;
         rendered_frames.push(render_sample(
             output_directory,
-            koi_development,
-            koi_body,
+            dragon_development,
+            dragon_body,
             &format!("{sample_name}-{contribution_total}"),
             &format!("{contribution_total} Contributions"),
             index_markdown,
@@ -307,31 +307,31 @@ fn render_growth_samples(
 /// Render and write one PNG/SVG pair, and list it in the index under a heading.
 fn render_sample(
     output_directory: &Path,
-    koi_development: &KoiDevelopment,
-    koi_body: KoiBody,
+    dragon_development: &DragonDevelopment,
+    dragon_body: DragonBody,
     file_stem: &str,
     heading: &str,
     index_markdown: &mut String,
-) -> Result<KoiFrame, Box<dyn Error>> {
-    let koi_frame = render_koi(koi_development, koi_body);
+) -> Result<DragonFrame, Box<dyn Error>> {
+    let dragon_frame = render_dragon(dragon_development, dragon_body);
     let file_name = format!("{file_stem}.png");
-    write_artifact(output_directory, &file_name, &encode_png(&koi_frame)?)?;
+    write_artifact(output_directory, &file_name, &encode_png(&dragon_frame)?)?;
     let svg_name = format!("{file_stem}.svg");
     write_artifact(
         output_directory,
         &svg_name,
-        encode_svg(&koi_frame).as_bytes(),
+        encode_svg(&dragon_frame).as_bytes(),
     )?;
     index_markdown.push_str(&format!(
         "### {heading}\n\n![{file_stem}]({file_name})\n\n[SVG]({svg_name})\n\n"
     ));
-    Ok(koi_frame)
+    Ok(dragon_frame)
 }
 
 fn write_overviews(
     output_directory: &Path,
     overview_name: &str,
-    rendered_frames: &[KoiFrame],
+    rendered_frames: &[DragonFrame],
 ) -> Result<(), Box<dyn Error>> {
     for (background_name, background_color) in
         [("light", [255, 255, 255, 255]), ("dark", [13, 17, 23, 255])]
@@ -351,14 +351,14 @@ fn capitalize(sample_name: &str) -> String {
 
 fn build_index_header(identity_seed: u64) -> String {
     let mut index_markdown = format!(
-        "# Koi Library\n\n\
+        "# Dragon Library\n\n\
         These samples share the same anatomy, pose, and Classic lighting. Language mixes\n\
         appear on the default white body, followed by each body with one language per\n\
         pigment, then streak markings. The samples use a fixed synthetic account seed,\n\
         explicit language shares with their GitHub colors, explicit growth totals, and\n\
         explicit streaks. Growth samples show normal colors and no streak fins.\n\n\
         Regenerate with the command in the\n\
-        [repository README](../README.md#koi-library).\n\n\
+        [repository README](../README.md#dragon-library).\n\n\
         In the mix and body overviews, columns follow the contribution totals below,\n\
         from left to right, and rows follow the mix or body order. These are samples of\n\
         continuous growth. The markings overview follows the streak marking sections in\n\
@@ -380,7 +380,7 @@ fn build_index_header(identity_seed: u64) -> String {
 }
 
 fn encode_overview(
-    rendered_frames: &[KoiFrame],
+    rendered_frames: &[DragonFrame],
     background_color: [u8; 4],
 ) -> Result<Vec<u8>, png::EncodingError> {
     let overview_scale = STATIC_EXPORT_SCALE as usize;

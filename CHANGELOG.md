@@ -6,6 +6,16 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Forked from git-koi: the koi is now a baby dragon seen from the side. It has bat
+  wings, legs, horns, and a spade-tipped tail that all grow with contributions, a pale
+  plated belly, a ridge of back spines, and an amber eye. It flies in place instead
+  of swimming laps: the wings beat and the body bobs, with harder beats and a surge
+  when darting, lazy beats when resting, folded wings when asleep, and fire breathing
+  instead of surface feeding. The bodies are emerald, crimson, azure, obsidian, gold,
+  and silver (`--body` names changed to match).
+
 ## [1.0.2] - 2026-10-31
 
 ### Fixed

@@ -1,16 +1,18 @@
-//! A curved koi colored from its languages on a chosen body, with Classic shading and
-//! transparent surroundings.
+//! A baby dragon seen from the side, colored from its languages on a chosen body, with
+//! Classic shading and transparent surroundings.
 //!
-//! The body and fins follow sampled curves, with shading that follows the body surface
-//! and fin rays that follow each fin's direction. The head widens from a round nose
-//! along a gentle slant, and short pixel whiskers angle forward from the snout.
-//! Contribution totals set the size through [`crate::koi::calculate_growth_fraction`],
-//! and growth slows as the fish matures. Young koi have a rounder head, larger eyes, a
-//! slimmer body, and short rounded fins, and grow into the adult shape by
-//! [`crate::koi::YOUNG_SHAPE_CONTRIBUTIONS`]. After [`crate::koi::ADULT_CONTRIBUTIONS`]
-//! the body keeps lengthening, broadens slightly, and its fins and tail lengthen; the
-//! maximum form keeps its anatomy at higher totals. Quiet days alone do not change the
-//! base anatomy. The pose and framing account for the body and fins.
+//! The body follows a sampled S-curve: a wedge-shaped head, an arched neck, a deep
+//! chest, and a long tapering tail that ends in a spade. A pale belly with plates runs
+//! underneath, a row of spines runs along the back, and two horns sweep back from the
+//! head. Bat wings spring from the shoulders; a near wing beats over the body and a
+//! darker far wing beats behind it. Short legs tuck under the chest and hips. Contribution
+//! totals set the size through [`crate::dragon::calculate_growth_fraction`], and growth
+//! slows as the dragon matures. Young dragons have a rounder head, larger eyes, a
+//! chubbier body, and small wings, and grow into the adult shape by
+//! [`crate::dragon::YOUNG_SHAPE_CONTRIBUTIONS`]. After [`crate::dragon::ADULT_CONTRIBUTIONS`]
+//! the body keeps lengthening, and its wings and tail lengthen; the maximum form keeps
+//! its anatomy at higher totals. Quiet days alone do not change the base anatomy. The
+//! pose and framing account for the wings and tail.
 //!
 //! Every growth level shares one square native canvas of [`FRAME_WIDTH_PIXELS`] by
 //! [`FRAME_HEIGHT_PIXELS`], which the encoders in [`crate::output`] scale up exactly.
@@ -20,93 +22,88 @@
 use std::f64::consts::{PI, TAU};
 
 use crate::behavior::Behavior;
-use crate::coat::{KoiBody, KoiCoat, WHITE_RAMP};
-use crate::koi::{
-    ADULT_CONTRIBUTIONS, KoiDevelopment, YOUNG_SHAPE_CONTRIBUTIONS, calculate_growth_fraction,
+use crate::coat::{DragonBody, DragonCoat};
+use crate::dragon::{
+    ADULT_CONTRIBUTIONS, DragonDevelopment, YOUNG_SHAPE_CONTRIBUTIONS, calculate_growth_fraction,
 };
-use crate::motion::{Course, STILL_POSE, SwimPose, calculate_swim_pose, frame_count};
+use crate::motion::{FlightPose, STILL_POSE, calculate_flight_pose, frame_count};
 
-/// Width of the native canvas every koi is drawn on, at every growth level.
+/// Width of the native canvas every dragon is drawn on, at every growth level.
 pub const FRAME_WIDTH_PIXELS: u32 = 256;
 /// Height of the native canvas; the canvas is square.
 pub const FRAME_HEIGHT_PIXELS: u32 = FRAME_WIDTH_PIXELS;
 
 /// A renderer-owned, fixed-size frame with row-major RGBA pixels.
 #[derive(Debug, Eq, PartialEq)]
-pub struct KoiFrame {
+pub struct DragonFrame {
     rgba_pixels: Vec<[u8; 4]>,
 }
 
-impl KoiFrame {
+impl DragonFrame {
     /// The pixels as bytes, row by row from the top left, four channels per pixel: red,
     /// green, blue, alpha. The length is the canvas area times four.
     pub fn as_rgba_bytes(&self) -> &[u8] {
         self.rgba_pixels.as_flattened()
     }
 
-    /// Build a frame from chosen pixels, for encoder tests that need colors no koi has.
+    /// Build a frame from chosen pixels, for encoder tests that need colors no dragon has.
     #[cfg(test)]
     pub(crate) fn from_rgba_pixels(rgba_pixels: Vec<[u8; 4]>) -> Self {
         Self { rgba_pixels }
     }
 }
 
-/// Render the koi in a centered, fixed swimming pose, colored from its languages on
-/// the caller's chosen body. Contribution totals set its size and how far its colors
-/// have come in. The account seed places patches in body coordinates, so growth does
-/// not reroll the pattern. Streak marks follow the development's streaks as of its
-/// observation date. Identical inputs produce identical pixels without I/O, clock
-/// reads, or input mutation.
-pub fn render_koi(koi_development: &KoiDevelopment, koi_body: KoiBody) -> KoiFrame {
-    let koi_anatomy = calculate_anatomy(koi_development.total_contributions);
+/// Render the dragon in a centered, fixed hovering pose with its wings raised, colored
+/// from its languages on the caller's chosen body. Contribution totals set its size and
+/// how far its colors have come in. The account seed places patches in body coordinates,
+/// so growth does not reroll the pattern. Streak marks follow the development's streaks
+/// as of its observation date. Identical inputs produce identical pixels without I/O,
+/// clock reads, or input mutation.
+pub fn render_dragon(dragon_development: &DragonDevelopment, dragon_body: DragonBody) -> DragonFrame {
+    let dragon_anatomy = calculate_anatomy(dragon_development.total_contributions);
     render_pose(
-        koi_development,
-        koi_body,
-        &koi_anatomy,
+        dragon_development,
+        dragon_body,
+        &dragon_anatomy,
         &STILL_POSE,
-        Framing::CenterOnKoi,
+        Framing::CenterOnDragon,
     )
 }
 
-/// Render one frame of a behavior's seamless loop, colored like `render_koi`, in the
-/// pose `motion::calculate_swim_pose` gives; frame numbers wrap around the loop of
-/// `motion::frame_count(behavior)` frames. Laps circle the frame center, and longer
-/// koi swim a tighter lap so every size fits. A hovering loop is framed once, centered
-/// on the koi's sweep, and its drift shrinks only as far as the largest koi need to
-/// stay inside. The view never follows the fins, so it never shakes. Under water the koi
-/// turns toward water blue and partly drops out, more with depth. Identical inputs
-/// produce identical pixels without I/O, clock reads, or input mutation.
-pub fn render_swim_frame(
-    koi_development: &KoiDevelopment,
-    koi_body: KoiBody,
+/// Render one frame of a behavior's seamless loop, colored like `render_dragon`, in the
+/// pose `motion::calculate_flight_pose` gives; frame numbers wrap around the loop of
+/// `motion::frame_count(behavior)` frames. The dragon flies in place: a loop is framed
+/// once, centered on everything the dragon covers across its frames, and its drift
+/// shrinks only as far as the largest dragons need to stay inside. The view never
+/// follows the wings, so it never shakes. Asleep the dragon turns toward moonlit blue
+/// and partly drops out, more with depth. Identical inputs produce identical pixels
+/// without I/O, clock reads, or input mutation.
+pub fn render_flight_frame(
+    dragon_development: &DragonDevelopment,
+    dragon_body: DragonBody,
     behavior: Behavior,
     frame_index: u32,
-) -> KoiFrame {
-    let koi_anatomy = calculate_anatomy(koi_development.total_contributions);
-    let swim_pose = calculate_swim_pose(behavior, frame_index);
-    let pose_center = match swim_pose.course {
-        Course::Lap { .. } => [0.0, 0.0],
-        Course::Hover { drift_pixels, .. } => {
-            let hover_fit = fit_hover_loop(behavior, &koi_anatomy);
-            [0, 1].map(|axis_index| {
-                hover_fit.sweep_center[axis_index]
-                    - hover_fit.drift_scales[axis_index] * drift_pixels[axis_index]
-            })
-        }
-    };
+) -> DragonFrame {
+    let dragon_anatomy = calculate_anatomy(dragon_development.total_contributions);
+    let flight_pose = calculate_flight_pose(behavior, frame_index);
+    let hover_fit = fit_hover_loop(behavior, &dragon_anatomy);
+    let pose_center = [0, 1].map(|axis_index| {
+        hover_fit.sweep_center[axis_index]
+            - hover_fit.drift_scales[axis_index] * flight_pose.drift_pixels[axis_index]
+    });
     render_pose(
-        koi_development,
-        koi_body,
-        &koi_anatomy,
-        &swim_pose,
+        dragon_development,
+        dragon_body,
+        &dragon_anatomy,
+        &flight_pose,
         Framing::At(pose_center),
     )
 }
 
-/// Where the view is centered: on the koi itself for the still image, or at a point
+/// Where the view is centered: on the dragon itself for the still image, or at a point
 /// fixed for the whole loop.
 enum Framing {
-    CenterOnKoi,
+    CenterOnDragon,
     At([f64; 2]),
 }
 
@@ -117,34 +114,50 @@ struct HoverFit {
     drift_scales: [f64; 2],
 }
 
-/// Center a hovering loop on everything the koi covers across its frames, then shrink
+/// Center a hovering loop on everything the dragon covers across its frames, then shrink
 /// the drift on each axis only as far as needed to keep every frame inside the frame.
-fn fit_hover_loop(behavior: Behavior, koi_anatomy: &KoiAnatomy) -> HoverFit {
+fn fit_hover_loop(behavior: Behavior, dragon_anatomy: &DragonAnatomy) -> HoverFit {
     // Room for the outline, a clear pixel at the frame edge, and rounding.
     const FIT_MARGIN_PIXELS: f64 = 2.5;
+    // Share of the body length reserved ahead of the mouth for breathing fire.
+    const PLUME_PER_BODY_LENGTH: f64 = 0.5;
     let frame_bounds: Vec<([[f64; 2]; 2], [f64; 2])> = (0..frame_count(behavior))
         .map(|frame_index| {
-            let swim_pose = calculate_swim_pose(behavior, frame_index);
-            let body_spine = build_spine(koi_anatomy, &swim_pose);
-            let fin_curves = build_fins(&body_spine, koi_anatomy, &swim_pose);
+            let flight_pose = calculate_flight_pose(behavior, frame_index);
+            let body_spine = build_spine(dragon_anatomy, &flight_pose);
+            let fin_curves = build_fins(&body_spine, dragon_anatomy, &flight_pose);
             let [mut min_corner, mut max_corner] = measure_curve_bounds(&body_spine, &fin_curves);
-            // A whisker point covers the pixel to its right and below.
-            for whisker_point in
-                calculate_whisker_points(&body_spine, koi_anatomy, swim_pose.whisker_sway_radians)
+            // A horn point covers the pixel to its right and below.
+            for horn_point in
+                calculate_horn_points(&body_spine, dragon_anatomy, flight_pose.horn_sway_radians)
             {
                 for axis_index in 0..2 {
-                    min_corner[axis_index] = min_corner[axis_index].min(whisker_point[axis_index]);
+                    min_corner[axis_index] = min_corner[axis_index].min(horn_point[axis_index]);
                     max_corner[axis_index] =
-                        max_corner[axis_index].max(whisker_point[axis_index] + 1.0);
+                        max_corner[axis_index].max(horn_point[axis_index] + 1.0);
                 }
             }
-            let drift_pixels = match swim_pose.course {
-                Course::Hover { drift_pixels, .. } => drift_pixels,
-                Course::Lap { .. } => [0.0; 2],
-            };
+            let drift_pixels = flight_pose.drift_pixels;
             ([min_corner, max_corner], drift_pixels)
         })
         .collect();
+    let mut frame_bounds = frame_bounds;
+    if calculate_flight_pose(behavior, 0).feeding_phase.is_some() {
+        // Leave room ahead of the mouth for the plume, as far as the frame allows.
+        let sweep_width = frame_bounds
+            .iter()
+            .map(|(bounds, _)| bounds[1][0])
+            .fold(f64::NEG_INFINITY, f64::max)
+            - frame_bounds
+                .iter()
+                .map(|(bounds, _)| bounds[0][0])
+                .fold(f64::INFINITY, f64::min);
+        let plume_room = (f64::from(FRAME_WIDTH_PIXELS) - 2.0 * FIT_MARGIN_PIXELS - sweep_width)
+            .clamp(0.0, dragon_anatomy.body_length_pixels * PLUME_PER_BODY_LENGTH);
+        for (bounds, _) in &mut frame_bounds {
+            bounds[1][0] += plume_room;
+        }
+    }
     let frame_sizes = [
         f64::from(FRAME_WIDTH_PIXELS),
         f64::from(FRAME_HEIGHT_PIXELS),
@@ -183,28 +196,28 @@ fn fit_hover_loop(behavior: Behavior, koi_anatomy: &KoiAnatomy) -> HoverFit {
 }
 
 fn render_pose(
-    koi_development: &KoiDevelopment,
-    koi_body: KoiBody,
-    koi_anatomy: &KoiAnatomy,
-    swim_pose: &SwimPose,
+    dragon_development: &DragonDevelopment,
+    dragon_body: DragonBody,
+    dragon_anatomy: &DragonAnatomy,
+    flight_pose: &FlightPose,
     framing: Framing,
-) -> KoiFrame {
-    let koi_coat = KoiCoat::new(koi_development, koi_body, |along_fraction| {
-        calculate_body_half_width(along_fraction, koi_anatomy)
+) -> DragonFrame {
+    let dragon_coat = DragonCoat::new(dragon_development, dragon_body, |along_fraction| {
+        calculate_body_half_width(along_fraction, dragon_anatomy)
     });
-    let body_spine = build_spine(koi_anatomy, swim_pose);
-    let fin_curves = build_fins(&body_spine, koi_anatomy, swim_pose);
+    let body_spine = build_spine(dragon_anatomy, flight_pose);
+    let fin_curves = build_fins(&body_spine, dragon_anatomy, flight_pose);
     let [min_corner, max_corner] = measure_curve_bounds(&body_spine, &fin_curves);
     let pose_center = match framing {
-        Framing::CenterOnKoi => [
+        Framing::CenterOnDragon => [
             (min_corner[0] + max_corner[0]) / 2.0,
             (min_corner[1] + max_corner[1]) / 2.0,
         ],
         Framing::At(pose_center) => pose_center,
     };
-    let koi_appearance = KoiAppearance {
-        koi_anatomy,
-        koi_coat: &koi_coat,
+    let dragon_appearance = DragonAppearance {
+        dragon_anatomy,
+        dragon_coat: &dragon_coat,
     };
     let mut rgba_pixels = Vec::with_capacity((FRAME_WIDTH_PIXELS * FRAME_HEIGHT_PIXELS) as usize);
     for pixel_y in 0..FRAME_HEIGHT_PIXELS {
@@ -219,12 +232,12 @@ fn render_pose(
                     .contains(&sample_position[axis_index])
             });
             rgba_pixels.push(if is_inside_bounds {
-                sample_koi(
+                sample_dragon(
                     &body_spine,
                     &fin_curves,
                     sample_position,
                     [pixel_x, pixel_y],
-                    &koi_appearance,
+                    &dragon_appearance,
                 )
             } else {
                 [0; 4]
@@ -234,31 +247,38 @@ fn render_pose(
     paint_mouth(
         &mut rgba_pixels,
         &body_spine,
-        koi_body,
+        dragon_body,
         pose_center,
-        swim_pose.mouth_opening,
+        flight_pose.mouth_opening,
     );
-    let fish_pixel_mask: Vec<bool> = rgba_pixels
+    paint_spines(
+        &mut rgba_pixels,
+        &body_spine,
+        dragon_anatomy,
+        pose_center,
+        dragon_coat.select_spine_color(),
+    );
+    let dragon_pixel_mask: Vec<bool> = rgba_pixels
         .iter()
         .map(|pixel_channels| pixel_channels[3] != 0)
         .collect();
-    let whisker_points =
-        calculate_whisker_points(&body_spine, koi_anatomy, swim_pose.whisker_sway_radians);
-    paint_whiskers(&mut rgba_pixels, &whisker_points, pose_center);
+    let horn_points =
+        calculate_horn_points(&body_spine, dragon_anatomy, flight_pose.horn_sway_radians);
+    paint_horns(&mut rgba_pixels, &horn_points, pose_center);
     paint_outline(&mut rgba_pixels);
-    if let Some(feeding_phase) = swim_pose.feeding_phase {
+    if let Some(feeding_phase) = flight_pose.feeding_phase {
         paint_feeding(
             &mut rgba_pixels,
             &body_spine,
-            koi_anatomy,
+            dragon_anatomy,
             pose_center,
             feeding_phase,
         );
     }
-    if swim_pose.depth > 0.0 {
-        paint_depth(&mut rgba_pixels, &fish_pixel_mask, swim_pose.depth);
+    if flight_pose.depth > 0.0 {
+        paint_depth(&mut rgba_pixels, &dragon_pixel_mask, flight_pose.depth);
     }
-    KoiFrame { rgba_pixels }
+    DragonFrame { rgba_pixels }
 }
 
 /// Where the mouth opens: on the snout's center line, just inside its front.
@@ -274,12 +294,12 @@ fn calculate_mouth_position(body_spine: &[CurvePoint]) -> [f64; 2] {
 
 /// The mouth: a circle at the front of the snout with a rim in the body's color around
 /// a dark opening, growing from under a pixel to half the snout's width as it opens.
-/// It is painted before the outline, so it is outlined like the koi, and a mostly
+/// It is painted before the outline, so it is outlined like the dragon, and a mostly
 /// closed mouth paints nothing.
 fn paint_mouth(
     rgba_pixels: &mut [[u8; 4]],
     body_spine: &[CurvePoint],
-    koi_body: KoiBody,
+    dragon_body: DragonBody,
     pose_center: [f64; 2],
     mouth_opening: f64,
 ) {
@@ -306,7 +326,7 @@ fn paint_mouth(
     let mouth = [0, 1].map(|axis_index| {
         mouth_world[axis_index] - pose_center[axis_index] + frame_sizes[axis_index] / 2.0
     });
-    let rim_color = koi_body.select_mouth_rim_color();
+    let rim_color = dragon_body.select_mouth_rim_color();
     let frame_width = FRAME_WIDTH_PIXELS as usize;
     let first_y = (mouth[1] - radius_pixels).floor().max(0.0) as usize;
     let last_y = ((mouth[1] + radius_pixels).ceil() as usize).min(FRAME_HEIGHT_PIXELS as usize - 1);
@@ -328,29 +348,29 @@ fn paint_mouth(
     }
 }
 
-/// Surface feeding: ripple rings spreading from the mouth and food pellets drifting in
-/// to it, drawn on the water around the koi. Where the frame edge leaves too little
-/// room, both shrink toward the mouth instead of running off the edge.
+/// Surface feeding: a plume of fire from the mouth, hot white and yellow near the jaws,
+/// cooling to orange and red embers, drawn in the air around the dragon. Where the frame
+/// edge leaves too little room, the plume shortens instead of running off the edge.
 fn paint_feeding(
     rgba_pixels: &mut [[u8; 4]],
     body_spine: &[CurvePoint],
-    koi_anatomy: &KoiAnatomy,
+    dragon_anatomy: &DragonAnatomy,
     pose_center: [f64; 2],
     feeding_phase: f64,
 ) {
-    const RING_COUNT: usize = 3;
-    const RING_WIDTH_PER_BODY_LENGTH: f64 = 0.3;
-    const RING_HEIGHT_PER_WIDTH: f64 = 0.4;
-    const RING_ANGLE_STEP_RADIANS: f64 = 0.035;
-    const PELLET_COUNT: usize = 5;
-    const PELLET_NEAREST_PIXELS: f64 = 4.0;
-    const PELLET_REACH_PIXELS: f64 = 14.0;
-    const PELLET_WANDER_PIXELS: f64 = 9.0;
-    // Pellets vanish just before they reach the mouth.
-    const PELLET_EATEN_LIFE: f64 = 0.92;
-    const PELLET_COLORS: [[u8; 4]; 2] = [[228, 166, 114, 255], [184, 111, 80, 255]];
-    // A clear pixel between the extras and the frame edge, plus rounding.
-    const EDGE_MARGIN_PIXELS: f64 = 2.0;
+    const PARTICLE_COUNT: usize = 72;
+    const REACH_PER_BODY_LENGTH: f64 = 0.6;
+    const SPREAD_PER_REACH: f64 = 0.24;
+    const FLAME_COLORS: [[u8; 4]; 5] = [
+        [255, 250, 214, 255],
+        [254, 231, 97, 255],
+        [254, 174, 52, 255],
+        [247, 118, 34, 255],
+        [190, 74, 47, 255],
+    ];
+    // A clear pixel between the flames and the frame edge, plus rounding.
+    const EDGE_MARGIN_PIXELS: f64 = 3.0;
+    const MIN_REACH_PIXELS: f64 = 8.0;
     let frame_sizes = [
         f64::from(FRAME_WIDTH_PIXELS),
         f64::from(FRAME_HEIGHT_PIXELS),
@@ -359,80 +379,67 @@ fn paint_feeding(
     let mouth = [0, 1].map(|axis_index| {
         mouth_world[axis_index] - pose_center[axis_index] + frame_sizes[axis_index] / 2.0
     });
-    let room = [0, 1].map(|axis_index| {
-        (mouth[axis_index] - EDGE_MARGIN_PIXELS)
-            .min(frame_sizes[axis_index] - 1.0 - EDGE_MARGIN_PIXELS - mouth[axis_index])
-            .max(0.0)
-    });
     let forward_direction = calculate_forward_direction(body_spine, 0);
+    let side_direction = [-forward_direction[1], forward_direction[0]];
+    let room_ahead = (0..2)
+        .filter(|&axis_index| forward_direction[axis_index].abs() > 1e-6)
+        .map(|axis_index| {
+            let room = if forward_direction[axis_index] > 0.0 {
+                frame_sizes[axis_index] - 1.0 - EDGE_MARGIN_PIXELS - mouth[axis_index]
+            } else {
+                mouth[axis_index] - EDGE_MARGIN_PIXELS
+            };
+            room.max(0.0) / forward_direction[axis_index].abs()
+        })
+        .fold(f64::INFINITY, f64::min);
+    let reach_pixels = (dragon_anatomy.body_length_pixels * REACH_PER_BODY_LENGTH)
+        .min(room_ahead - 4.0)
+        .max(MIN_REACH_PIXELS.min(room_ahead));
     let frame_width = FRAME_WIDTH_PIXELS as usize;
-    let mut paint_water = |point: [f64; 2], color: [u8; 4], dither_limit: f64| {
+    let mut paint_air = |point: [f64; 2], color: [u8; 4]| {
         let [pixel_x, pixel_y] = point.map(f64::floor);
         if !(0.0..frame_sizes[0]).contains(&pixel_x) || !(0.0..frame_sizes[1]).contains(&pixel_y) {
             return;
         }
         let pixel_index = pixel_y as usize * frame_width + pixel_x as usize;
-        if rgba_pixels[pixel_index][3] == 0
-            && calculate_dither_threshold([pixel_x as u32, pixel_y as u32]) < dither_limit
-        {
+        if rgba_pixels[pixel_index][3] == 0 {
             rgba_pixels[pixel_index] = color;
         }
     };
-    let largest_ring_width = koi_anatomy.body_length_pixels * RING_WIDTH_PER_BODY_LENGTH * 0.85;
-    let ring_scale = 1.0_f64
-        .min(room[0] / largest_ring_width)
-        .min(room[1] / (largest_ring_width * RING_HEIGHT_PER_WIDTH));
-    for ring_index in 0..RING_COUNT {
-        let ring_phase = (feeding_phase + ring_index as f64 / RING_COUNT as f64).fract();
-        let ring_width = ring_scale
-            * koi_anatomy.body_length_pixels
-            * RING_WIDTH_PER_BODY_LENGTH
-            * (0.25 + 0.6 * ring_phase);
-        let ring_color = WHITE_RAMP[if ring_index % 2 == 1 { 2 } else { 1 }];
-        let mut ring_angle: f64 = 0.0;
-        while ring_angle < TAU {
-            paint_water(
-                [
-                    mouth[0] + ring_angle.cos() * ring_width,
-                    mouth[1] + ring_angle.sin() * ring_width * RING_HEIGHT_PER_WIDTH,
-                ],
-                ring_color,
-                (1.0 - ring_phase) * 0.75,
-            );
-            ring_angle += RING_ANGLE_STEP_RADIANS;
-        }
-    }
-    // The second pellet pixel sits one to the right, so leave it room too.
-    let farthest_pellet_pixels = PELLET_NEAREST_PIXELS + PELLET_REACH_PIXELS + PELLET_WANDER_PIXELS;
-    let pellet_scale = 1.0_f64.min((room[0].min(room[1]) - 1.0).max(0.0) / farthest_pellet_pixels);
-    for pellet_index in 0..PELLET_COUNT {
-        let life = (feeding_phase + pellet_index as f64 / PELLET_COUNT as f64).fract();
-        if life >= PELLET_EATEN_LIFE {
+    for particle_index in 0..PARTICLE_COUNT {
+        let life = (feeding_phase + particle_index as f64 / PARTICLE_COUNT as f64).fract();
+        let distance_pixels = 3.0 + life * reach_pixels;
+        let spread_pixels = life.powf(0.85)
+            * reach_pixels
+            * SPREAD_PER_REACH
+            * (particle_index as f64 * 2.399).sin();
+        let particle = [0, 1].map(|axis_index| {
+            mouth[axis_index]
+                + forward_direction[axis_index] * distance_pixels
+                + side_direction[axis_index] * spread_pixels
+        });
+        let [pixel_x, pixel_y] = particle.map(f64::floor);
+        if calculate_dither_threshold([pixel_x.max(0.0) as u32, pixel_y.max(0.0) as u32])
+            > 1.15 - life
+        {
             continue;
         }
-        let reach = PELLET_NEAREST_PIXELS + (1.0 - life) * PELLET_REACH_PIXELS;
-        let wander = (1.0 - life) * PELLET_WANDER_PIXELS;
-        let pellet_point = [
-            mouth[0]
-                + pellet_scale
-                    * (forward_direction[0] * reach + (pellet_index as f64 * 2.1).sin() * wander),
-            mouth[1]
-                + pellet_scale
-                    * (forward_direction[1] * reach + (pellet_index as f64 * 1.7).cos() * wander),
-        ];
-        paint_water(pellet_point, PELLET_COLORS[0], 1.0);
-        paint_water(
-            [pellet_point[0] + 1.0, pellet_point[1]],
-            PELLET_COLORS[1],
-            1.0,
-        );
+        let color = FLAME_COLORS[((life.powf(0.85) * FLAME_COLORS.len() as f64) as usize)
+            .min(FLAME_COLORS.len() - 1)];
+        paint_air(particle, color);
+        // Flames are fat near the jaws and thin to single sparks.
+        if life < 0.6 {
+            for offset in [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
+                paint_air([particle[0] + offset[0], particle[1] + offset[1]], color);
+            }
+        }
     }
 }
 
-/// Under water the koi becomes a blue koi: each body and fin pixel maps its own
-/// brightness onto a water-blue scale, the whiskers and outline soften to deep blue,
+/// Asleep, the dragon turns moonlit blue: each body and fin pixel maps its own
+/// brightness onto a water-blue scale, the horns and outline soften to deep blue,
 /// and a dithered share of each drops out, more for the outline.
-fn paint_depth(rgba_pixels: &mut [[u8; 4]], fish_pixel_mask: &[bool], depth: f64) {
+fn paint_depth(rgba_pixels: &mut [[u8; 4]], dragon_pixel_mask: &[bool], depth: f64) {
     const DEEP_WATER: [f64; 3] = [18.0, 78.0, 137.0];
     const MID_WATER: [f64; 3] = [0.0, 153.0, 219.0];
     const SHALLOW_WATER: [f64; 3] = [190.0, 225.0, 245.0];
@@ -446,8 +453,8 @@ fn paint_depth(rgba_pixels: &mut [[u8; 4]], fish_pixel_mask: &[bool], depth: f64
         if pixel_channels[3] == 0 {
             continue;
         }
-        let is_fish_pixel = fish_pixel_mask[pixel_index];
-        let dropout_per_depth = if is_fish_pixel {
+        let is_dragon_pixel = dragon_pixel_mask[pixel_index];
+        let dropout_per_depth = if is_dragon_pixel {
             FISH_DROPOUT_PER_DEPTH
         } else {
             OUTLINE_DROPOUT_PER_DEPTH
@@ -462,7 +469,7 @@ fn paint_depth(rgba_pixels: &mut [[u8; 4]], fish_pixel_mask: &[bool], depth: f64
         }
         let original_color =
             [0, 1, 2].map(|channel_index| f64::from(pixel_channels[channel_index]));
-        let water_color = if is_fish_pixel {
+        let water_color = if is_dragon_pixel {
             let brightness =
                 (0.3 * original_color[0] + 0.59 * original_color[1] + 0.11 * original_color[2])
                     / 255.0;
@@ -489,28 +496,33 @@ fn paint_depth(rgba_pixels: &mut [[u8; 4]], fish_pixel_mask: &[bool], depth: f64
 }
 
 const OUTLINE_COLOR: [u8; 4] = [24, 20, 37, 255];
+const HORN_COLOR: [u8; 4] = [234, 212, 170, 255];
 const DITHER_RANKS: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-struct KoiAnatomy {
+struct DragonAnatomy {
     body_length_pixels: f64,
     body_width_pixels: f64,
-    /// Share of the body length over which the head widens from the nose.
+    /// Share of the body length that the head covers, from the nose to the jaw.
     head_slant_fraction: f64,
     /// Nose width as a share of the full body width.
     nose_width_fraction: f64,
+    /// Width of the head at the jaw as a share of the full body width.
+    head_width_fraction: f64,
+    /// Width of the neck as a share of the full body width.
+    neck_width_fraction: f64,
     /// Exponent of the taper from the shoulders to the tail stalk.
     tail_taper_exponent: f64,
     /// Fin shapes blend from young (0) to adult (1).
     adult_fin_fraction: f64,
     fin_length_multiplier: f64,
     eye_along_fraction: f64,
-    /// Young koi have proportionally larger eyes; adults use 1.
+    /// Young dragons have proportionally larger eyes; adults use 1.
     eye_scale: f64,
 }
 
-struct KoiAppearance<'a> {
-    koi_anatomy: &'a KoiAnatomy,
-    koi_coat: &'a KoiCoat,
+struct DragonAppearance<'a> {
+    dragon_anatomy: &'a DragonAnatomy,
+    dragon_coat: &'a DragonCoat,
 }
 
 // Positions and half widths are pixels; consecutive points form tapered strokes.
@@ -559,103 +571,147 @@ impl FinShape {
     }
 }
 
-// Each pair shares its proportions: short rounded fins when young, longer adult fins.
-// Direction offsets in radians describe the two fins independently, relative to the
-// spine's backward tangent.
+// Wings, legs, and the tail share one shape: small and short when young, longer when
+// grown. Near limbs are drawn over the body, far limbs behind it. Direction offsets in
+// radians are relative to the spine's backward tangent; a negative turn points down.
 struct FinPair {
     fin_kind: FinKind,
+    in_front: bool,
     root_along_fraction: f64,
+    /// Where on the body's depth the limb is rooted: -1 is the back, 1 the belly.
     root_side_fraction: f64,
     young_shape: FinShape,
     adult_shape: FinShape,
-    direction_offsets: [&'static [f64]; 2],
+    direction_offsets: &'static [f64],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum FinKind {
+    /// The spade-tipped tail.
     Tail,
-    Side,
-    Pelvic,
+    /// Wings, with a membrane stretched between finger bones.
+    Wing,
+    /// Fore and hind legs, in scale color.
+    Leg,
 }
 
-const FIN_PAIRS: [FinPair; 3] = [
+const fn leg_shape(length_body_widths: f64) -> FinShape {
+    FinShape {
+        length_body_widths,
+        half_width_body_widths: 0.11,
+        width_start_fraction: 0.2,
+        taper_exponent: 0.5,
+    }
+}
+
+const WING_SHAPE_YOUNG: FinShape = FinShape {
+    length_body_widths: 1.4,
+    half_width_body_widths: 0.0,
+    width_start_fraction: 0.0,
+    taper_exponent: 0.0,
+};
+const WING_SHAPE_ADULT: FinShape = FinShape {
+    length_body_widths: 2.3,
+    half_width_body_widths: 0.0,
+    width_start_fraction: 0.0,
+    taper_exponent: 0.0,
+};
+
+const FIN_PAIRS: [FinPair; 7] = [
     FinPair {
         fin_kind: FinKind::Tail,
+        in_front: false,
         root_along_fraction: 1.0,
         root_side_fraction: 0.0,
         young_shape: FinShape {
-            length_body_widths: 1.05,
-            half_width_body_widths: 0.3,
-            width_start_fraction: 0.16,
+            length_body_widths: 0.8,
+            half_width_body_widths: 0.24,
+            width_start_fraction: 0.0,
             taper_exponent: 0.6,
         },
         adult_shape: FinShape {
-            length_body_widths: 1.62,
-            half_width_body_widths: 0.3,
-            width_start_fraction: 0.125,
-            taper_exponent: 0.69,
+            length_body_widths: 1.5,
+            half_width_body_widths: 0.18,
+            width_start_fraction: 0.0,
+            taper_exponent: 0.6,
         },
-        direction_offsets: [
-            &[-0.18035, -0.25648, -0.37367, -0.50421, -0.61344, -0.66997],
-            &[0.248, 0.30115, 0.29856, 0.24064, 0.14695, 0.05079],
-        ],
+        direction_offsets: &[0.0, 0.05, 0.18, 0.34, 0.48, 0.5],
     },
     FinPair {
-        fin_kind: FinKind::Side,
-        root_along_fraction: 0.22,
+        fin_kind: FinKind::Wing,
+        in_front: false,
+        root_along_fraction: 0.33,
+        root_side_fraction: -0.75,
+        young_shape: WING_SHAPE_YOUNG,
+        adult_shape: WING_SHAPE_ADULT,
+        direction_offsets: &[],
+    },
+    FinPair {
+        fin_kind: FinKind::Wing,
+        in_front: true,
+        root_along_fraction: 0.36,
+        root_side_fraction: -0.8,
+        young_shape: WING_SHAPE_YOUNG,
+        adult_shape: WING_SHAPE_ADULT,
+        direction_offsets: &[],
+    },
+    FinPair {
+        fin_kind: FinKind::Leg,
+        in_front: false,
+        root_along_fraction: 0.38,
         root_side_fraction: 0.8,
-        young_shape: FinShape {
-            length_body_widths: 0.66,
-            half_width_body_widths: 0.25,
-            width_start_fraction: 0.18,
-            taper_exponent: 0.45,
-        },
-        adult_shape: FinShape {
-            length_body_widths: 1.13,
-            half_width_body_widths: 0.24,
-            width_start_fraction: 0.09,
-            taper_exponent: 0.54,
-        },
-        direction_offsets: [
-            &[0.87, 0.77239, 0.71583, 0.70044],
-            &[-0.65221, -0.58002, -0.5356, -0.48311],
-        ],
+        young_shape: leg_shape(0.4),
+        adult_shape: leg_shape(0.55),
+        direction_offsets: &[-0.8, -1.1, -1.55],
     },
     FinPair {
-        fin_kind: FinKind::Pelvic,
-        root_along_fraction: 0.47,
-        root_side_fraction: 0.7,
-        young_shape: FinShape {
-            length_body_widths: 0.36,
-            half_width_body_widths: 0.1,
-            width_start_fraction: 0.15,
-            taper_exponent: 0.5,
-        },
-        adult_shape: FinShape {
-            length_body_widths: 0.57,
-            half_width_body_widths: 0.11,
-            width_start_fraction: 0.11,
-            taper_exponent: 0.59,
-        },
-        direction_offsets: [&[0.39139, 0.3769, 0.39376], &[-0.62997, -0.48164, -0.32809]],
+        fin_kind: FinKind::Leg,
+        in_front: true,
+        root_along_fraction: 0.41,
+        root_side_fraction: 0.8,
+        young_shape: leg_shape(0.4),
+        adult_shape: leg_shape(0.55),
+        direction_offsets: &[-1.0, -1.35, -1.8],
+    },
+    FinPair {
+        fin_kind: FinKind::Leg,
+        in_front: false,
+        root_along_fraction: 0.64,
+        root_side_fraction: 0.75,
+        young_shape: leg_shape(0.45),
+        adult_shape: leg_shape(0.65),
+        direction_offsets: &[-0.6, -1.0, -1.5],
+    },
+    FinPair {
+        fin_kind: FinKind::Leg,
+        in_front: true,
+        root_along_fraction: 0.67,
+        root_side_fraction: 0.75,
+        young_shape: leg_shape(0.45),
+        adult_shape: leg_shape(0.65),
+        direction_offsets: &[-0.8, -1.2, -1.75],
     },
 ];
 
-fn calculate_anatomy(total_contributions: u64) -> KoiAnatomy {
+fn calculate_anatomy(total_contributions: u64) -> DragonAnatomy {
     const MIN_BODY_LENGTH_PIXELS: f64 = 37.5;
     const ADULT_BODY_LENGTH_PIXELS: f64 = 137.5;
     const MAX_BODY_LENGTH_PIXELS: f64 = 167.5;
-    const YOUNG_BODY_WIDTH_FRACTION: f64 = 0.17;
-    const ADULT_BODY_WIDTH_FRACTION: f64 = 0.2;
+    const YOUNG_BODY_WIDTH_FRACTION: f64 = 0.27;
+    const ADULT_BODY_WIDTH_FRACTION: f64 = 0.22;
     const MATURE_BODY_WIDTH_GAIN: f64 = 0.045;
-    const YOUNG_HEAD_SLANT_FRACTION: f64 = 0.14;
-    const ADULT_HEAD_SLANT_FRACTION: f64 = 0.187;
-    const YOUNG_NOSE_WIDTH_FRACTION: f64 = 0.75;
-    const ADULT_NOSE_WIDTH_FRACTION: f64 = 0.517;
+    const YOUNG_HEAD_SLANT_FRACTION: f64 = 0.19;
+    const ADULT_HEAD_SLANT_FRACTION: f64 = 0.15;
+    const YOUNG_NOSE_WIDTH_FRACTION: f64 = 0.62;
+    const YOUNG_HEAD_WIDTH_FRACTION: f64 = 0.98;
+    const ADULT_HEAD_WIDTH_FRACTION: f64 = 0.78;
+    const YOUNG_NECK_WIDTH_FRACTION: f64 = 0.78;
+    const ADULT_NECK_WIDTH_FRACTION: f64 = 0.55;
+    const ADULT_NOSE_WIDTH_FRACTION: f64 = 0.4;
     const YOUNG_TAIL_TAPER_EXPONENT: f64 = 1.25;
     const ADULT_TAIL_TAPER_EXPONENT: f64 = 1.8;
-    const YOUNG_EYE_ALONG_FRACTION: f64 = 0.08;
-    const ADULT_EYE_ALONG_FRACTION: f64 = 0.06;
+    const YOUNG_EYE_ALONG_FRACTION: f64 = 0.1;
+    const ADULT_EYE_ALONG_FRACTION: f64 = 0.07;
     const YOUNG_EYE_SCALE: f64 = 2.1;
     const YOUNG_FIN_LENGTH_MULTIPLIER: f64 = 0.85;
     const MAX_FIN_LENGTH_MULTIPLIER: f64 = 1.1;
@@ -676,7 +732,7 @@ fn calculate_anatomy(total_contributions: u64) -> KoiAnatomy {
         ADULT_BODY_WIDTH_FRACTION,
         adult_shape_fraction,
     ) + MATURE_BODY_WIDTH_GAIN * mature_growth_fraction;
-    KoiAnatomy {
+    DragonAnatomy {
         body_length_pixels,
         body_width_pixels: body_length_pixels * body_width_fraction,
         head_slant_fraction: interpolate(
@@ -706,6 +762,16 @@ fn calculate_anatomy(total_contributions: u64) -> KoiAnatomy {
             MAX_FIN_LENGTH_MULTIPLIER,
             mature_growth_fraction,
         ),
+        head_width_fraction: interpolate(
+            YOUNG_HEAD_WIDTH_FRACTION,
+            ADULT_HEAD_WIDTH_FRACTION,
+            adult_shape_fraction,
+        ),
+        neck_width_fraction: interpolate(
+            YOUNG_NECK_WIDTH_FRACTION,
+            ADULT_NECK_WIDTH_FRACTION,
+            adult_shape_fraction,
+        ),
         eye_along_fraction: interpolate(
             YOUNG_EYE_ALONG_FRACTION,
             ADULT_EYE_ALONG_FRACTION,
@@ -725,149 +791,247 @@ fn smooth_step(fraction: f64) -> f64 {
     fraction * fraction * (3.0 - 2.0 * fraction)
 }
 
-/// The spine follows the pose's course: the still pose's fixed heading and gentle bend,
-/// turned by any heading offset, or a clockwise circle around the frame center.
-fn build_spine(koi_anatomy: &KoiAnatomy, swim_pose: &SwimPose) -> Vec<CurvePoint> {
-    const HEADING_RADIANS: f64 = -0.08;
-    const BEND_RADIANS: f64 = 0.35;
-    const WAVE_AMPLITUDE_FRACTION: f64 = 0.06;
-    const WAVE_CYCLES: f64 = 0.9;
-    let body_length_pixels = koi_anatomy.body_length_pixels;
-    let point_count = body_length_pixels.round() as usize;
+/// The spine runs from the nose back through the neck, chest, and tail as an S-curve:
+/// the head is held up, the neck arches down to the shoulders, the body is nearly level,
+/// and the tail hangs and curls up at its tip. Each pair is a share of the body length
+/// and the turn that the spine takes there; positive turns point the way back up.
+const POSTURE: [(f64, f64); 9] = [
+    (0.0, 0.05),
+    (0.1, 0.0),
+    (0.16, -0.55),
+    (0.24, -1.05),
+    (0.33, -0.4),
+    (0.5, -0.15),
+    (0.68, -0.3),
+    (0.85, -0.05),
+    (1.0, 0.6),
+];
+
+fn calculate_posture(along_fraction: f64) -> f64 {
+    for posture_pair in POSTURE.windows(2) {
+        let [(start_fraction, start_turn), (end_fraction, end_turn)] =
+            [posture_pair[0], posture_pair[1]];
+        if along_fraction <= end_fraction {
+            return interpolate(
+                start_turn,
+                end_turn,
+                (along_fraction - start_fraction) / (end_fraction - start_fraction),
+            );
+        }
+    }
+    POSTURE[POSTURE.len() - 1].1
+}
+
+fn build_spine(dragon_anatomy: &DragonAnatomy, flight_pose: &FlightPose) -> Vec<CurvePoint> {
+    const SWISH_RADIANS: f64 = 0.3;
+    const SWISH_CYCLES: f64 = 0.8;
     const MIN_HALF_WIDTH_PIXELS: f64 = 1.3;
+    let point_count = dragon_anatomy.body_length_pixels.round() as usize;
     let calculate_point_half_width = |point_index: usize| {
-        calculate_body_half_width(point_index as f64 / point_count as f64, koi_anatomy)
+        calculate_body_half_width(point_index as f64 / point_count as f64, dragon_anatomy)
             .max(MIN_HALF_WIDTH_PIXELS)
     };
-    let center_points = match swim_pose.course {
-        Course::Hover {
-            heading_offset_radians,
-            ..
-        } => {
-            let mut center_points = vec![CurvePoint {
-                position: [0.0, 0.0],
-                half_width_pixels: calculate_point_half_width(0),
-            }];
-            for point_index in 1..point_count {
-                let backward_angle_radians = HEADING_RADIANS
-                    + heading_offset_radians
-                    + PI
-                    + BEND_RADIANS * point_index as f64 / point_count as f64;
-                let [previous_x, previous_y] = center_points[point_index - 1].position;
-                center_points.push(CurvePoint {
-                    position: [
-                        previous_x + backward_angle_radians.cos(),
-                        previous_y + backward_angle_radians.sin(),
-                    ],
-                    half_width_pixels: calculate_point_half_width(point_index),
-                });
-            }
-            center_points
-        }
-        // Each body point sits one pixel of arc behind the one in front.
-        Course::Lap { angle_radians } => {
-            let radius_pixels = calculate_lap_radius(body_length_pixels);
-            (0..point_count)
-                .map(|point_index| {
-                    let point_angle_radians = angle_radians - point_index as f64 / radius_pixels;
-                    CurvePoint {
-                        position: [
-                            radius_pixels * point_angle_radians.cos(),
-                            radius_pixels * point_angle_radians.sin(),
-                        ],
-                        half_width_pixels: calculate_point_half_width(point_index),
-                    }
-                })
-                .collect()
-        }
-    };
-    let mut body_spine = Vec::with_capacity(point_count);
-    for (point_index, center_point) in center_points.iter().enumerate() {
+    let mut body_spine = vec![CurvePoint {
+        position: [0.0, 0.0],
+        half_width_pixels: calculate_point_half_width(0),
+    }];
+    for point_index in 1..point_count {
         let along_fraction = point_index as f64 / point_count as f64;
-        let forward_direction = calculate_forward_direction(&center_points, point_index);
-        let head_wave_fraction = 0.1;
-        let wave_envelope =
-            head_wave_fraction + (1.0 - head_wave_fraction) * along_fraction.powi(2);
-        let wave_offset = body_length_pixels
-            * WAVE_AMPLITUDE_FRACTION
-            * swim_pose.wave_strength
-            * wave_envelope
-            * (along_fraction * TAU * WAVE_CYCLES - swim_pose.wave_phase_radians).sin();
+        // The tail swishes, more toward its tip.
+        let swish_radians = SWISH_RADIANS
+            * flight_pose.swish_strength
+            * along_fraction.powi(2)
+            * (along_fraction * TAU * SWISH_CYCLES - flight_pose.swish_phase_radians).sin();
+        let backward_angle_radians =
+            PI + flight_pose.pitch_radians + calculate_posture(along_fraction) + swish_radians;
+        let [previous_x, previous_y] = body_spine[point_index - 1].position;
         body_spine.push(CurvePoint {
             position: [
-                center_point.position[0] - forward_direction[1] * wave_offset,
-                center_point.position[1] + forward_direction[0] * wave_offset,
+                previous_x + backward_angle_radians.cos(),
+                previous_y + backward_angle_radians.sin(),
             ],
-            half_width_pixels: center_point.half_width_pixels,
+            half_width_pixels: calculate_point_half_width(point_index),
         });
     }
     body_spine
 }
 
-/// Each fin turns at its root and bends along its length as the pose says; a turn
-/// outward is away from the body, whichever side the fin is on.
+/// One limb with where it is drawn: over the body, or behind it.
+struct Limb {
+    part: FinPart,
+    fin_kind: FinKind,
+    in_front: bool,
+}
+
+/// The wing's sweep from straight up, at the top and the bottom of the beat.
+const WING_UP_SWEEP_RADIANS: f64 = 0.15;
+const WING_DOWN_SWEEP_RADIANS: f64 = 2.3;
+
 fn build_fins(
     body_spine: &[CurvePoint],
-    koi_anatomy: &KoiAnatomy,
-    swim_pose: &SwimPose,
-) -> Vec<Vec<CurvePoint>> {
-    let mut fin_curves = Vec::new();
+    dragon_anatomy: &DragonAnatomy,
+    flight_pose: &FlightPose,
+) -> Vec<Limb> {
+    let mut limbs = Vec::new();
     for fin_pair in &FIN_PAIRS {
         let root_index =
             (fin_pair.root_along_fraction * (body_spine.len() - 1) as f64).round() as usize;
         let root_point = body_spine[root_index];
         let forward_direction = calculate_forward_direction(body_spine, root_index);
         let backward_angle_radians = (-forward_direction[1]).atan2(-forward_direction[0]);
-        for (side_index, (body_side, direction_offsets)) in [-1.0, 1.0]
-            .into_iter()
-            .zip(fin_pair.direction_offsets)
-            .enumerate()
-        {
-            let outward_sign = direction_offsets[0].signum();
-            let (root_turn_radians, bend_radians) = match fin_pair.fin_kind {
-                FinKind::Tail => (
-                    outward_sign * swim_pose.tail_spread_radians,
-                    swim_pose.tail_lobe_bends_radians[side_index],
-                ),
-                FinKind::Side => (
-                    outward_sign * swim_pose.side_fin_openings_radians[side_index],
-                    outward_sign * swim_pose.side_fin_bends_radians[side_index],
-                ),
-                FinKind::Pelvic => (outward_sign * swim_pose.pelvic_fin_opening_radians, 0.0),
-            };
-            let root_offset_pixels =
-                root_point.half_width_pixels * fin_pair.root_side_fraction * body_side;
-            let root_position = [
-                root_point.position[0] - forward_direction[1] * root_offset_pixels,
-                root_point.position[1] + forward_direction[0] * root_offset_pixels,
-            ];
-            fin_curves.push(build_fin(
+        let root_offset_pixels = root_point.half_width_pixels * fin_pair.root_side_fraction;
+        let root_position = [
+            root_point.position[0] - forward_direction[1] * root_offset_pixels,
+            root_point.position[1] + forward_direction[0] * root_offset_pixels,
+        ];
+        let part = match fin_pair.fin_kind {
+            FinKind::Wing => {
+                // The wing's frame is the level body, not the arched neck it springs from.
+                let wing_back_angle_radians = PI + flight_pose.pitch_radians;
+                let wing_up_direction = [wing_back_angle_radians.sin(), wing_back_angle_radians.cos()];
+                let wing_root = [
+                    root_point.position[0] + wing_up_direction[0] * root_offset_pixels,
+                    root_point.position[1] + wing_up_direction[1] * root_offset_pixels,
+                ];
+                let wing_beat = if fin_pair.in_front {
+                    flight_pose.wing_beat
+                } else {
+                    flight_pose.far_wing_beat
+                };
+                FinPart::Wing(build_wing(
+                    fin_pair,
+                    wing_root,
+                    wing_back_angle_radians,
+                    interpolate(
+                        WING_DOWN_SWEEP_RADIANS,
+                        WING_UP_SWEEP_RADIANS,
+                        (wing_beat.clamp(-1.0, 1.0) + 1.0) / 2.0,
+                    ),
+                    flight_pose.wing_bend_radians,
+                    dragon_anatomy,
+                ))
+            }
+            FinKind::Tail => FinPart::Stroke(build_fin(
                 fin_pair,
                 root_position,
-                backward_angle_radians + root_turn_radians,
-                koi_anatomy,
-                direction_offsets,
-                bend_radians,
-            ));
-        }
+                backward_angle_radians,
+                dragon_anatomy,
+                fin_pair.direction_offsets,
+                0.4 * flight_pose.swish_strength
+                    * (flight_pose.swish_phase_radians - 1.7).sin(),
+            )),
+            FinKind::Leg => FinPart::Stroke(build_fin(
+                fin_pair,
+                root_position,
+                backward_angle_radians + flight_pose.leg_swing_radians,
+                dragon_anatomy,
+                fin_pair.direction_offsets,
+                0.0,
+            )),
+        };
+        limbs.push(Limb {
+            part,
+            fin_kind: fin_pair.fin_kind,
+            in_front: fin_pair.in_front,
+        });
     }
-    fin_curves
+    limbs
+}
+
+/// One drawn fin part: a tapered stroke, or a wing with its bones and membrane.
+enum FinPart {
+    Stroke(Vec<CurvePoint>),
+    Wing(Wing),
+}
+
+/// A bat wing: a membrane outline with scalloped edges, an arm bone from the shoulder
+/// to the wrist, and finger bones from the wrist out to the membrane's points.
+struct Wing {
+    outline: Vec<[f64; 2]>,
+    shoulder: [f64; 2],
+    bones: Vec<[[f64; 2]; 2]>,
+    span_pixels: f64,
+}
+
+/// Wing points as shares of the span: back along the body, then out from it.
+const WING_WRIST: [f64; 2] = [0.05, 0.55];
+const WING_FINGER_TIPS: [[f64; 2]; 4] = [[0.2, 1.0], [0.4, 0.95], [0.57, 0.78], [0.7, 0.55]];
+const WING_HIND_ATTACHMENT: [f64; 2] = [0.62, 0.06];
+/// How far each scallop dips toward the wrist, as a share of the way there.
+const WING_SCALLOP_DEPTH: f64 = 0.3;
+
+fn build_wing(
+    fin_pair: &FinPair,
+    shoulder: [f64; 2],
+    backward_angle_radians: f64,
+    sweep_radians: f64,
+    bend_radians: f64,
+    dragon_anatomy: &DragonAnatomy,
+) -> Wing {
+    let fin_shape = fin_pair
+        .young_shape
+        .blend(fin_pair.adult_shape, dragon_anatomy.adult_fin_fraction);
+    let span_pixels = dragon_anatomy.body_width_pixels
+        * fin_shape.length_body_widths
+        * dragon_anatomy.fin_length_multiplier;
+    let back_direction = [backward_angle_radians.cos(), backward_angle_radians.sin()];
+    // Up from the body's back.
+    let up_direction = [-back_direction[1], back_direction[0]];
+    let place = |local: [f64; 2]| {
+        // Points farther out flex more, so the tip trails the arm.
+        let turn_radians = sweep_radians - bend_radians * local[1];
+        let [turn_cos, turn_sin] = [turn_radians.cos(), turn_radians.sin()];
+        let back_share = local[0] * turn_cos + local[1] * turn_sin;
+        let up_share = -local[0] * turn_sin + local[1] * turn_cos;
+        [0, 1].map(|axis_index| {
+            shoulder[axis_index]
+                + span_pixels
+                    * (back_direction[axis_index] * back_share
+                        + up_direction[axis_index] * up_share)
+        })
+    };
+    let wrist = place(WING_WRIST);
+    let mut membrane_points: Vec<[f64; 2]> =
+        WING_FINGER_TIPS.iter().map(|&tip| place(tip)).collect();
+    membrane_points.push(place(WING_HIND_ATTACHMENT));
+    let mut outline = vec![shoulder, wrist];
+    outline.push(membrane_points[0]);
+    for tip_pair in membrane_points.windows(2) {
+        let scallop_middle = [0, 1].map(|axis_index| {
+            let midpoint = (tip_pair[0][axis_index] + tip_pair[1][axis_index]) / 2.0;
+            midpoint + (wrist[axis_index] - midpoint) * WING_SCALLOP_DEPTH
+        });
+        outline.push(scallop_middle);
+        outline.push(tip_pair[1]);
+    }
+    let mut bones = vec![[shoulder, wrist]];
+    bones.extend(
+        membrane_points[..WING_FINGER_TIPS.len()]
+            .iter()
+            .map(|&tip| [wrist, tip]),
+    );
+    Wing {
+        outline,
+        shoulder,
+        bones,
+        span_pixels,
+    }
 }
 
 fn build_fin(
     fin_pair: &FinPair,
     root_position: [f64; 2],
     backward_angle_radians: f64,
-    koi_anatomy: &KoiAnatomy,
+    dragon_anatomy: &DragonAnatomy,
     direction_offsets: &[f64],
     bend_radians: f64,
 ) -> Vec<CurvePoint> {
     let fin_shape = fin_pair
         .young_shape
-        .blend(fin_pair.adult_shape, koi_anatomy.adult_fin_fraction);
-    let fin_length_pixels = koi_anatomy.body_width_pixels
+        .blend(fin_pair.adult_shape, dragon_anatomy.adult_fin_fraction);
+    let fin_length_pixels = dragon_anatomy.body_width_pixels
         * fin_shape.length_body_widths
-        * koi_anatomy.fin_length_multiplier;
+        * dragon_anatomy.fin_length_multiplier;
     let segment_count = fin_length_pixels.ceil() as usize;
     let segment_length_pixels = fin_length_pixels / segment_count as f64;
     let mut center_position = root_position;
@@ -878,12 +1042,21 @@ fn build_fin(
             + (1.0 - fin_shape.width_start_fraction) * along_fraction;
         fin_points.push(CurvePoint {
             position: center_position,
-            half_width_pixels: koi_anatomy.body_width_pixels
+            half_width_pixels: dragon_anatomy.body_width_pixels
                 * fin_shape.half_width_body_widths
-                * (PI * width_progress)
-                    .sin()
-                    .max(0.0)
-                    .powf(fin_shape.taper_exponent),
+                * if fin_pair.fin_kind == FinKind::Tail {
+                    // A thin stalk that swells into a spade at the tip.
+                    (PI * ((along_fraction - 0.55) / 0.45).clamp(0.0, 1.0))
+                        .sin()
+                        .max(0.0)
+                        .powf(0.8)
+                        .max(0.5)
+                } else {
+                    (PI * width_progress)
+                        .sin()
+                        .max(0.0)
+                        .powf(fin_shape.taper_exponent)
+                },
         });
         let direction_position = (along_fraction * direction_offsets.len() as f64 - 0.5)
             .clamp(0.0, (direction_offsets.len() - 1) as f64);
@@ -900,15 +1073,15 @@ fn build_fin(
     fin_points
 }
 
-/// Paint the whisker points. They fill only empty pixels and are painted before the
-/// outline, so they are outlined like the koi.
-fn paint_whiskers(rgba_pixels: &mut [[u8; 4]], whisker_points: &[[f64; 2]], pose_center: [f64; 2]) {
+/// Paint the horn points. They fill only empty pixels and are painted before the
+/// outline, so they are outlined like the dragon.
+fn paint_horns(rgba_pixels: &mut [[u8; 4]], horn_points: &[[f64; 2]], pose_center: [f64; 2]) {
     let frame_width = FRAME_WIDTH_PIXELS as usize;
-    for whisker_point in whisker_points {
+    for horn_point in horn_points {
         let pixel_x =
-            (whisker_point[0] - pose_center[0] + f64::from(FRAME_WIDTH_PIXELS) / 2.0).floor();
+            (horn_point[0] - pose_center[0] + f64::from(FRAME_WIDTH_PIXELS) / 2.0).floor();
         let pixel_y =
-            (whisker_point[1] - pose_center[1] + f64::from(FRAME_HEIGHT_PIXELS) / 2.0).floor();
+            (horn_point[1] - pose_center[1] + f64::from(FRAME_HEIGHT_PIXELS) / 2.0).floor();
         if !(0.0..f64::from(FRAME_WIDTH_PIXELS)).contains(&pixel_x)
             || !(0.0..f64::from(FRAME_HEIGHT_PIXELS)).contains(&pixel_y)
         {
@@ -916,100 +1089,192 @@ fn paint_whiskers(rgba_pixels: &mut [[u8; 4]], whisker_points: &[[f64; 2]], pose
         }
         let pixel_index = pixel_y as usize * frame_width + pixel_x as usize;
         if rgba_pixels[pixel_index][3] == 0 {
-            rgba_pixels[pixel_index] = WHITE_RAMP[1];
+            rgba_pixels[pixel_index] = HORN_COLOR;
         }
     }
 }
 
-/// One point per whisker pixel: short lines angled forward and out from the edge of
-/// the snout, swung together by the sway.
-fn calculate_whisker_points(
+/// One point per horn pixel: two short bones that sweep up and back from the top of
+/// the head, swung together by the sway.
+fn calculate_horn_points(
     body_spine: &[CurvePoint],
-    koi_anatomy: &KoiAnatomy,
+    dragon_anatomy: &DragonAnatomy,
     sway_radians: f64,
 ) -> Vec<[f64; 2]> {
-    const SPREAD_RADIANS: f64 = 0.85;
-    const ROOT_SIDE_FRACTION: f64 = 0.8;
-    const ROOT_FORWARD_FRACTION: f64 = 0.55;
-    let whisker_length_pixels = calculate_whisker_length(koi_anatomy);
-    let snout_position = body_spine[0].position;
-    let snout_radius_pixels = body_spine[0].half_width_pixels;
-    let forward_direction = calculate_forward_direction(body_spine, 0);
-    let heading_radians = forward_direction[1].atan2(forward_direction[0]);
-    let mut whisker_points = Vec::new();
-    for body_side in [-1.0, 1.0] {
-        let side_offset_pixels = snout_radius_pixels * ROOT_SIDE_FRACTION * body_side;
-        let forward_offset_pixels = snout_radius_pixels * ROOT_FORWARD_FRACTION;
-        let root_position = [
-            snout_position[0] - forward_direction[1] * side_offset_pixels
-                + forward_direction[0] * forward_offset_pixels,
-            snout_position[1]
-                + forward_direction[0] * side_offset_pixels
-                + forward_direction[1] * forward_offset_pixels,
+    // Root along the head, the angle from the heading, and the share of full length.
+    const HORNS: [(f64, f64, f64); 2] = [(0.9, -2.05, 1.0), (0.78, -1.7, 0.75)];
+    const CURL_RADIANS_PER_PIXEL: f64 = 0.1;
+    const ROOT_DEPTH_FRACTION: f64 = 0.8;
+    let horn_length_pixels = f64::from(calculate_horn_length(dragon_anatomy));
+    let mut horn_points = Vec::new();
+    for (root_along_head, outward_radians, length_share) in HORNS {
+        let root_index = ((dragon_anatomy.head_slant_fraction * root_along_head)
+            * (body_spine.len() - 1) as f64)
+            .round() as usize;
+        let root_point = body_spine[root_index];
+        let forward_direction = calculate_forward_direction(body_spine, root_index);
+        let heading_radians = forward_direction[1].atan2(forward_direction[0]);
+        let depth_offset_pixels = -root_point.half_width_pixels * ROOT_DEPTH_FRACTION;
+        let mut horn_position = [
+            root_point.position[0] - forward_direction[1] * depth_offset_pixels,
+            root_point.position[1] + forward_direction[0] * depth_offset_pixels,
         ];
-        let whisker_angle = heading_radians + sway_radians + body_side * SPREAD_RADIANS;
-        for step_pixels in 1..=whisker_length_pixels {
-            whisker_points.push([
-                root_position[0] + whisker_angle.cos() * f64::from(step_pixels),
-                root_position[1] + whisker_angle.sin() * f64::from(step_pixels),
-            ]);
+        let mut horn_angle = heading_radians + sway_radians + outward_radians;
+        for _ in 0..(horn_length_pixels * length_share).round() as usize {
+            horn_position[0] += horn_angle.cos();
+            horn_position[1] += horn_angle.sin();
+            horn_points.push(horn_position);
+            // A second pixel beside each one makes the horn two pixels thick.
+            horn_points.push([horn_position[0] + 1.0, horn_position[1]]);
+            // Each horn curls back toward the tail as it grows.
+            horn_angle -= CURL_RADIANS_PER_PIXEL;
         }
     }
-    whisker_points
+    horn_points
 }
 
-/// Whiskers grow with the koi, from three to five pixels.
-fn calculate_whisker_length(koi_anatomy: &KoiAnatomy) -> u32 {
-    const BODY_PIXELS_PER_WHISKER_PIXEL: f64 = 34.0;
-    (koi_anatomy.body_length_pixels / BODY_PIXELS_PER_WHISKER_PIXEL)
+/// A row of spines along the back, small near the neck, tallest over the shoulders and
+/// hips, and shrinking toward the tail. Each leans back and fills only empty pixels, so
+/// it rises from the body's edge and is outlined with the dragon.
+fn paint_spines(
+    rgba_pixels: &mut [[u8; 4]],
+    body_spine: &[CurvePoint],
+    dragon_anatomy: &DragonAnatomy,
+    pose_center: [f64; 2],
+    spine_color: [u8; 4],
+) {
+    const FIRST_ALONG_FRACTION: f64 = 0.19;
+    const LAST_ALONG_FRACTION: f64 = 0.92;
+    const BODY_PIXELS_PER_SPINE: f64 = 24.0;
+    let frame_width = FRAME_WIDTH_PIXELS as usize;
+    let spine_count = ((LAST_ALONG_FRACTION - FIRST_ALONG_FRACTION)
+        * dragon_anatomy.body_length_pixels
+        / (dragon_anatomy.body_length_pixels / BODY_PIXELS_PER_SPINE).clamp(3.0, 6.0))
+    .round() as usize;
+    for spine_index in 0..spine_count {
+        let along_fraction = FIRST_ALONG_FRACTION
+            + (LAST_ALONG_FRACTION - FIRST_ALONG_FRACTION) * (spine_index as f64 + 0.5)
+                / spine_count as f64;
+        let point_index = (along_fraction * (body_spine.len() - 1) as f64) as usize;
+        let body_point = body_spine[point_index];
+        let forward_direction = calculate_forward_direction(body_spine, point_index);
+        let up_direction = [forward_direction[1], -forward_direction[0]];
+        let height_pixels = (dragon_anatomy.body_width_pixels * 0.2).clamp(1.5, 6.0)
+            * (1.0 - 0.6 * ((along_fraction - 0.45) / 0.47).clamp(0.0, 1.0));
+        let step_count = height_pixels.ceil() as i32;
+        for step in 0..=step_count {
+            let step_fraction = f64::from(step) / f64::from(step_count + 1);
+            let half_width_pixels = 1.5 * (1.0 - step_fraction);
+            let mut offset_pixels = -half_width_pixels;
+            while offset_pixels <= half_width_pixels {
+                let rise_pixels = body_point.half_width_pixels * 0.85 + f64::from(step);
+                let lean_pixels = -0.6 * f64::from(step) + offset_pixels;
+                let spine_position = [
+                    body_point.position[0]
+                        + up_direction[0] * rise_pixels
+                        + forward_direction[0] * lean_pixels,
+                    body_point.position[1]
+                        + up_direction[1] * rise_pixels
+                        + forward_direction[1] * lean_pixels,
+                ];
+                let pixel_x =
+                    (spine_position[0] - pose_center[0] + f64::from(FRAME_WIDTH_PIXELS) / 2.0)
+                        .floor();
+                let pixel_y =
+                    (spine_position[1] - pose_center[1] + f64::from(FRAME_HEIGHT_PIXELS) / 2.0)
+                        .floor();
+                if (0.0..f64::from(FRAME_WIDTH_PIXELS)).contains(&pixel_x)
+                    && (0.0..f64::from(FRAME_HEIGHT_PIXELS)).contains(&pixel_y)
+                {
+                    let pixel_index = pixel_y as usize * frame_width + pixel_x as usize;
+                    if rgba_pixels[pixel_index][3] == 0 {
+                        rgba_pixels[pixel_index] = spine_color;
+                    }
+                }
+                offset_pixels += 1.0;
+            }
+        }
+    }
+}
+
+/// Horns grow with the dragon, from three to eight pixels.
+fn calculate_horn_length(dragon_anatomy: &DragonAnatomy) -> u32 {
+    const BODY_PIXELS_PER_HORN_PIXEL: f64 = 22.0;
+    (dragon_anatomy.body_length_pixels / BODY_PIXELS_PER_HORN_PIXEL)
         .round()
-        .clamp(3.0, 5.0) as u32
-}
-
-/// The lap circle's radius: as wide as the frame allows, tighter for longer koi so the
-/// whole fish stays inside, and never so tight that the body covers more than its
-/// share of the circle.
-fn calculate_lap_radius(body_length_pixels: f64) -> f64 {
-    const FRAME_REACH_PIXELS: f64 = 116.0;
-    const OUTER_REACH_FRACTION: f64 = 0.33;
-    const MAX_LAP_RADIUS_PIXELS: f64 = 88.0;
-    const MAX_BODY_SHARE_OF_LAP: f64 = 0.6;
-    (FRAME_REACH_PIXELS - OUTER_REACH_FRACTION * body_length_pixels)
-        .min(MAX_LAP_RADIUS_PIXELS)
-        .max(body_length_pixels / (TAU * MAX_BODY_SHARE_OF_LAP))
+        .clamp(3.0, 8.0) as u32
 }
 
 /// The corners of the box that holds every curve, including its half widths.
-fn measure_curve_bounds(
-    body_spine: &[CurvePoint],
-    fin_curves: &[Vec<CurvePoint>],
-) -> [[f64; 2]; 2] {
+fn measure_curve_bounds(body_spine: &[CurvePoint], limbs: &[Limb]) -> [[f64; 2]; 2] {
     let mut min_corner = [f64::INFINITY; 2];
     let mut max_corner = [f64::NEG_INFINITY; 2];
-    for curve_point in body_spine.iter().chain(fin_curves.iter().flatten()) {
+    let mut include = |position: [f64; 2], half_width_pixels: f64| {
         for axis_index in 0..2 {
-            min_corner[axis_index] = min_corner[axis_index]
-                .min(curve_point.position[axis_index] - curve_point.half_width_pixels);
-            max_corner[axis_index] = max_corner[axis_index]
-                .max(curve_point.position[axis_index] + curve_point.half_width_pixels);
+            min_corner[axis_index] =
+                min_corner[axis_index].min(position[axis_index] - half_width_pixels);
+            max_corner[axis_index] =
+                max_corner[axis_index].max(position[axis_index] + half_width_pixels);
+        }
+    };
+    for curve_point in body_spine {
+        include(curve_point.position, curve_point.half_width_pixels);
+    }
+    for limb in limbs {
+        match &limb.part {
+            FinPart::Stroke(fin_points) => {
+                for curve_point in fin_points {
+                    include(curve_point.position, curve_point.half_width_pixels);
+                }
+            }
+            FinPart::Wing(wing) => {
+                for &outline_point in &wing.outline {
+                    include(outline_point, 0.0);
+                }
+            }
         }
     }
     [min_corner, max_corner]
 }
 
-fn sample_koi(
+/// Near limbs first, then the body, then the far limbs, which are darker for depth.
+fn sample_dragon(
     body_spine: &[CurvePoint],
-    fin_curves: &[Vec<CurvePoint>],
+    limbs: &[Limb],
     sample_position: [f64; 2],
     pixel_position: [u32; 2],
-    koi_appearance: &KoiAppearance,
+    dragon_appearance: &DragonAppearance,
 ) -> [u8; 4] {
-    if let Some(body_sample) = sample_curve(body_spine, sample_position) {
-        return shade_body(&body_sample, pixel_position, koi_appearance);
+    const FAR_LIMB_BRIGHTNESS: f64 = 0.68;
+    let sample_limb = |limb: &Limb| match &limb.part {
+        FinPart::Stroke(fin_curve) => sample_curve(fin_curve, sample_position).map(|fin_sample| {
+            shade_fin(
+                &fin_sample,
+                limb.fin_kind,
+                pixel_position,
+                dragon_appearance.dragon_coat,
+            )
+        }),
+        FinPart::Wing(wing) => shade_wing(
+            wing,
+            sample_position,
+            pixel_position,
+            dragon_appearance.dragon_coat,
+        ),
+    };
+    for limb in limbs.iter().filter(|limb| limb.in_front) {
+        if let Some(limb_color) = sample_limb(limb) {
+            return limb_color;
+        }
     }
-    for fin_curve in fin_curves {
-        if let Some(fin_sample) = sample_curve(fin_curve, sample_position) {
-            return shade_fin(&fin_sample, pixel_position, koi_appearance.koi_coat);
+    if let Some(body_sample) = sample_curve(body_spine, sample_position) {
+        return shade_body(&body_sample, pixel_position, dragon_appearance);
+    }
+    for limb in limbs.iter().filter(|limb| !limb.in_front) {
+        if let Some(limb_color) = sample_limb(limb) {
+            let [red, green, blue, alpha] = limb_color;
+            let shade = |channel: u8| (f64::from(channel) * FAR_LIMB_BRIGHTNESS).round() as u8;
+            return [shade(red), shade(green), shade(blue), alpha];
         }
     }
     [0; 4]
@@ -1055,12 +1320,12 @@ fn sample_curve(curve_points: &[CurvePoint], sample_position: [f64; 2]) -> Optio
 fn shade_body(
     body_sample: &CurveSample,
     pixel_position: [u32; 2],
-    koi_appearance: &KoiAppearance,
+    dragon_appearance: &DragonAppearance,
 ) -> [u8; 4] {
-    let koi_anatomy = koi_appearance.koi_anatomy;
-    let body_length_pixels = koi_anatomy.body_length_pixels;
+    let dragon_anatomy = dragon_appearance.dragon_anatomy;
+    let body_length_pixels = dragon_anatomy.body_length_pixels;
     let lateral_fraction = body_sample.lateral_pixels / body_sample.half_width_pixels;
-    let body_paint = koi_appearance.koi_coat.select_body_paint(
+    let body_paint = dragon_appearance.dragon_coat.select_body_paint(
         body_sample.along_fraction,
         lateral_fraction,
         body_length_pixels,
@@ -1071,19 +1336,24 @@ fn shade_body(
     if body_sample.distance_pixels > body_sample.half_width_pixels - INNER_RIM_PIXELS {
         return body_paint.shade_ramp[0];
     }
-    let eye_lateral_fraction = 0.55;
-    let eye_half_thickness_pixels = 0.8 * koi_anatomy.eye_scale;
-    let eye_half_span_fraction = 0.25 * koi_anatomy.eye_scale.sqrt();
-    if ((body_sample.along_fraction - koi_anatomy.eye_along_fraction) * body_length_pixels).abs()
-        < eye_half_thickness_pixels
-        && (lateral_fraction.abs() - eye_lateral_fraction).abs() < eye_half_span_fraction
-    {
-        return OUTLINE_COLOR;
+    // One round amber eye with a dark pupil, high on the side of the head.
+    let eye_radius_pixels = 1.7 * dragon_anatomy.eye_scale.sqrt();
+    let eye_offset_pixels = [
+        (body_sample.along_fraction - dragon_anatomy.eye_along_fraction) * body_length_pixels,
+        (lateral_fraction + 0.3) * body_sample.half_width_pixels,
+    ];
+    let eye_distance_pixels = eye_offset_pixels[0].hypot(eye_offset_pixels[1]);
+    if eye_distance_pixels < eye_radius_pixels {
+        return if eye_distance_pixels < eye_radius_pixels * 0.5 {
+            OUTLINE_COLOR
+        } else {
+            dragon_appearance.dragon_coat.select_eye_color()
+        };
     }
     if let Some(glint_color) = body_paint.glint_color {
         return glint_color;
     }
-    let surface_brightness = calculate_body_brightness(body_sample, lateral_fraction, koi_anatomy)
+    let surface_brightness = calculate_body_brightness(body_sample, lateral_fraction, dragon_anatomy)
         + body_paint.brightness_shift;
     adjust_saturation(
         choose_shade(body_paint.shade_ramp, surface_brightness, pixel_position),
@@ -1094,7 +1364,7 @@ fn shade_body(
 fn calculate_body_brightness(
     body_sample: &CurveSample,
     lateral_fraction: f64,
-    koi_anatomy: &KoiAnatomy,
+    dragon_anatomy: &DragonAnatomy,
 ) -> f64 {
     const AMBIENT_BRIGHTNESS: f64 = 0.24;
     const DIFFUSE_STRENGTH: f64 = 0.7;
@@ -1105,19 +1375,21 @@ fn calculate_body_brightness(
             + body_sample.normal_direction[1] * LIGHT_DIRECTION[1])
         + surface_normal_z * LIGHT_DIRECTION[2];
     let mut surface_brightness = AMBIENT_BRIGHTNESS + DIFFUSE_STRENGTH * incident_light.max(0.0);
-    let dorsal_span = 0.27..0.62;
-    let dorsal_half_width_fraction = 0.1;
-    let dorsal_shadow = 0.18;
+    // A ridge of spines runs down the back, dark and light in turn.
+    let dorsal_span = (dragon_anatomy.head_slant_fraction + 0.05)..0.9;
+    let dorsal_half_width_fraction = 0.7;
     if dorsal_span.contains(&body_sample.along_fraction)
-        && lateral_fraction.abs() < dorsal_half_width_fraction
+        && lateral_fraction < -dorsal_half_width_fraction
     {
-        surface_brightness -= dorsal_shadow;
+        let spine_phase = (body_sample.along_fraction * dragon_anatomy.body_length_pixels / 3.0)
+            .rem_euclid(1.0);
+        surface_brightness += if spine_phase < 0.5 { -0.22 } else { 0.18 };
     }
     // The gill line sits near the back of the head's slant.
-    let gill_along_fraction = koi_anatomy.head_slant_fraction * 0.72;
+    let gill_along_fraction = dragon_anatomy.head_slant_fraction * 0.72;
     let gill_inner_fraction = 0.3;
     let gill_shadow = 0.22;
-    if ((body_sample.along_fraction - gill_along_fraction) * koi_anatomy.body_length_pixels).abs()
+    if ((body_sample.along_fraction - gill_along_fraction) * dragon_anatomy.body_length_pixels).abs()
         < 0.5
         && lateral_fraction.abs() > gill_inner_fraction
     {
@@ -1126,12 +1398,103 @@ fn calculate_body_brightness(
     surface_brightness
 }
 
-fn shade_fin(fin_sample: &CurveSample, pixel_position: [u32; 2], koi_coat: &KoiCoat) -> [u8; 4] {
+/// Whether the point lies inside the polygon, by counting edge crossings.
+fn is_inside_polygon(outline: &[[f64; 2]], point: [f64; 2]) -> bool {
+    let mut is_inside = false;
+    let mut previous = outline[outline.len() - 1];
+    for &vertex in outline {
+        if (vertex[1] > point[1]) != (previous[1] > point[1])
+            && point[0]
+                < (previous[0] - vertex[0]) * (point[1] - vertex[1]) / (previous[1] - vertex[1])
+                    + vertex[0]
+        {
+            is_inside = !is_inside;
+        }
+        previous = vertex;
+    }
+    is_inside
+}
+
+fn calculate_segment_distance(segment: [[f64; 2]; 2], point: [f64; 2]) -> f64 {
+    let [start, end] = segment;
+    let segment_x = end[0] - start[0];
+    let segment_y = end[1] - start[1];
+    let squared_length = (segment_x * segment_x + segment_y * segment_y).max(1e-9);
+    let progress = (((point[0] - start[0]) * segment_x + (point[1] - start[1]) * segment_y)
+        / squared_length)
+        .clamp(0.0, 1.0);
+    (point[0] - start[0] - progress * segment_x).hypot(point[1] - start[1] - progress * segment_y)
+}
+
+/// A wing pixel: dark bones, a rim along the membrane's edge, and a membrane that
+/// brightens away from the bones.
+fn shade_wing(
+    wing: &Wing,
+    sample_position: [f64; 2],
+    pixel_position: [u32; 2],
+    dragon_coat: &DragonCoat,
+) -> Option<[u8; 4]> {
+    const BONE_HALF_WIDTH_PIXELS: f64 = 0.75;
+    const RIM_PIXELS: f64 = 0.8;
+    const BONE_FADE_PIXELS: f64 = 7.0;
+    if !is_inside_polygon(&wing.outline, sample_position) {
+        return None;
+    }
+    let mut edge_distance_pixels = f64::INFINITY;
+    let mut previous = wing.outline[wing.outline.len() - 1];
+    for &vertex in &wing.outline {
+        edge_distance_pixels =
+            edge_distance_pixels.min(calculate_segment_distance([previous, vertex], sample_position));
+        previous = vertex;
+    }
+    let bone_distance_pixels = wing
+        .bones
+        .iter()
+        .map(|&bone| calculate_segment_distance(bone, sample_position))
+        .fold(f64::INFINITY, f64::min);
+    let is_on_rim = edge_distance_pixels < RIM_PIXELS;
+    let along_fraction = ((sample_position[0] - wing.shoulder[0])
+        .hypot(sample_position[1] - wing.shoulder[1])
+        / wing.span_pixels)
+        .min(1.0);
+    let fin_paint = dragon_coat.select_fin_paint(
+        along_fraction,
+        0.0,
+        is_on_rim,
+        calculate_dither_threshold(pixel_position),
+    );
+    if bone_distance_pixels < BONE_HALF_WIDTH_PIXELS {
+        return Some(adjust_saturation(fin_paint.shade_ramp[0], fin_paint.saturation));
+    }
+    if is_on_rim {
+        return Some(adjust_saturation(fin_paint.shade_ramp[1], fin_paint.saturation));
+    }
+    let surface_brightness = 0.3 + 0.4 * (bone_distance_pixels / BONE_FADE_PIXELS).min(1.0);
+    Some(adjust_saturation(
+        choose_shade(fin_paint.shade_ramp, surface_brightness, pixel_position),
+        fin_paint.saturation,
+    ))
+}
+
+fn shade_fin(
+    fin_sample: &CurveSample,
+    fin_kind: FinKind,
+    pixel_position: [u32; 2],
+    dragon_coat: &DragonCoat,
+) -> [u8; 4] {
     const FIN_RIM_PIXELS: f64 = 0.6;
-    const FIN_RAY_SPACING_PIXELS: f64 = 1.8;
+    const WING_BONE_SPACING_PIXELS: f64 = 2.6;
     const FIN_ROOT_SHADOW: f64 = 0.12;
     let is_on_rim = fin_sample.distance_pixels > fin_sample.half_width_pixels - FIN_RIM_PIXELS;
-    let fin_paint = koi_coat.select_fin_paint(
+    if fin_kind == FinKind::Leg || (fin_kind == FinKind::Tail && fin_sample.along_fraction < 0.55) {
+        let limb_ramp = dragon_coat.select_limb_ramp();
+        return if is_on_rim {
+            limb_ramp[0]
+        } else {
+            choose_shade(limb_ramp, 0.55, pixel_position)
+        };
+    }
+    let fin_paint = dragon_coat.select_fin_paint(
         fin_sample.along_fraction,
         fin_sample.lateral_pixels / fin_sample.half_width_pixels,
         is_on_rim,
@@ -1140,13 +1503,12 @@ fn shade_fin(fin_sample: &CurveSample, pixel_position: [u32; 2], koi_coat: &KoiC
     if is_on_rim {
         return adjust_saturation(fin_paint.shade_ramp[1], fin_paint.saturation);
     }
-    let ray_phase = (fin_sample.lateral_pixels / FIN_RAY_SPACING_PIXELS).rem_euclid(1.0);
-    let ray_brightness = 0.68;
-    let membrane_brightness = 0.94;
-    let surface_brightness = if ray_phase < 0.5 {
-        ray_brightness
+    let surface_brightness = if fin_kind == FinKind::Wing {
+        // Dark finger bones fan out across a lighter membrane.
+        let bone_phase = (fin_sample.lateral_pixels / WING_BONE_SPACING_PIXELS).rem_euclid(1.0);
+        if bone_phase < 0.22 { 0.3 } else { 0.86 }
     } else {
-        membrane_brightness
+        0.8 - 0.25 * fin_sample.lateral_pixels.abs() / fin_sample.half_width_pixels
     };
     let root_shadow = FIN_ROOT_SHADOW * (1.0 - fin_sample.along_fraction).powi(2);
     adjust_saturation(
@@ -1159,28 +1521,45 @@ fn shade_fin(fin_sample: &CurveSample, pixel_position: [u32; 2], koi_coat: &KoiC
     )
 }
 
-/// The body is drawn as a chain of round segments. The head widens from a round nose
-/// along a gentle slant, so no segment outgrows the one in front of it: a steeper rise
-/// leaves a knob at the tip, and a narrow head behind a wide body leaves a pinch.
-fn calculate_body_half_width(along_fraction: f64, koi_anatomy: &KoiAnatomy) -> f64 {
-    const MIN_SHOULDER_FRACTION: f64 = 0.3;
-    const SHOULDER_GAP_FRACTION: f64 = 0.04;
-    const TAPER_END_FRACTION: f64 = 0.92;
-    const TAIL_WIDTH_FRACTION: f64 = 0.26;
-    let head_slant_fraction = koi_anatomy.head_slant_fraction;
-    let width_fraction = if along_fraction < head_slant_fraction {
-        let nose_width_fraction = koi_anatomy.nose_width_fraction;
+/// The body is drawn as a chain of round segments: a wedge-shaped head that widens from
+/// the snout to the jaw, a narrower neck, a deep chest, and a long tapering tail.
+/// Young dragons have a bigger, blunter head on a thicker neck.
+fn calculate_body_half_width(along_fraction: f64, dragon_anatomy: &DragonAnatomy) -> f64 {
+    const CHEST_FRACTION: f64 = 0.34;
+    const NECK_LENGTH_FRACTION: f64 = 0.06;
+    const TAPER_START_FRACTION: f64 = 0.5;
+    const TAPER_END_FRACTION: f64 = 0.96;
+    const TAIL_WIDTH_FRACTION: f64 = 0.2;
+    let head_end_fraction = dragon_anatomy.head_slant_fraction;
+    let head_width_fraction = dragon_anatomy.head_width_fraction;
+    let neck_width_fraction = dragon_anatomy.neck_width_fraction;
+    let neck_start_fraction = head_end_fraction + 0.015;
+    let chest_start_fraction = neck_start_fraction + NECK_LENGTH_FRACTION;
+    let width_fraction = if along_fraction < head_end_fraction {
+        let nose_width_fraction = dragon_anatomy.nose_width_fraction;
         nose_width_fraction
-            + (1.0 - nose_width_fraction) * (along_fraction / head_slant_fraction * PI / 2.0).sin()
+            + (head_width_fraction - nose_width_fraction)
+                * (along_fraction / head_end_fraction * PI / 2.0).sin().powf(0.8)
+    } else if along_fraction < chest_start_fraction {
+        let neck_progress =
+            ((along_fraction - head_end_fraction) / (chest_start_fraction - head_end_fraction))
+                .clamp(0.0, 1.0);
+        interpolate(
+            head_width_fraction,
+            neck_width_fraction,
+            smooth_step(neck_progress * 1.6),
+        )
+    } else if along_fraction < CHEST_FRACTION {
+        let chest_progress =
+            (along_fraction - chest_start_fraction) / (CHEST_FRACTION - chest_start_fraction);
+        interpolate(neck_width_fraction, 1.0, smooth_step(chest_progress))
     } else {
-        let shoulder_fraction =
-            (head_slant_fraction + SHOULDER_GAP_FRACTION).max(MIN_SHOULDER_FRACTION);
-        let taper_length_fraction = TAPER_END_FRACTION - shoulder_fraction;
-        (1.0 - ((along_fraction - shoulder_fraction).max(0.0) / taper_length_fraction)
-            .powf(koi_anatomy.tail_taper_exponent))
+        (1.0 - ((along_fraction - TAPER_START_FRACTION).max(0.0)
+            / (TAPER_END_FRACTION - TAPER_START_FRACTION))
+            .powf(dragon_anatomy.tail_taper_exponent))
         .max(TAIL_WIDTH_FRACTION)
     };
-    koi_anatomy.body_width_pixels / 2.0 * width_fraction
+    dragon_anatomy.body_width_pixels / 2.0 * width_fraction
 }
 
 fn calculate_forward_direction(curve_points: &[CurvePoint], point_index: usize) -> [f64; 2] {
@@ -1254,15 +1633,15 @@ mod tests {
     use super::*;
 
     /// Paint only the mouth on an empty canvas centered on it.
-    fn paint_mouth_alone(koi_body: KoiBody, mouth_opening: f64) -> Vec<[u8; 4]> {
-        let koi_anatomy = calculate_anatomy(1_500);
-        let body_spine = build_spine(&koi_anatomy, &STILL_POSE);
+    fn paint_mouth_alone(dragon_body: DragonBody, mouth_opening: f64) -> Vec<[u8; 4]> {
+        let dragon_anatomy = calculate_anatomy(1_500);
+        let body_spine = build_spine(&dragon_anatomy, &STILL_POSE);
         let mut rgba_pixels = vec![[0; 4]; (FRAME_WIDTH_PIXELS * FRAME_HEIGHT_PIXELS) as usize];
         let mouth_position = calculate_mouth_position(&body_spine);
         paint_mouth(
             &mut rgba_pixels,
             &body_spine,
-            koi_body,
+            dragon_body,
             mouth_position,
             mouth_opening,
         );
@@ -1283,22 +1662,22 @@ mod tests {
 
     #[test]
     fn the_mouth_opens_as_a_body_colored_rim_around_a_dark_opening() {
-        assert_eq!(count_painted(&paint_mouth_alone(KoiBody::White, 0.1)), 0);
-        for (koi_body, rim_color) in [
-            (KoiBody::White, [192, 203, 220, 255]),
-            (KoiBody::Black, [58, 68, 102, 255]),
+        assert_eq!(count_painted(&paint_mouth_alone(DragonBody::Emerald, 0.1)), 0);
+        for (dragon_body, rim_color) in [
+            (DragonBody::Emerald, [64, 160, 84, 255]),
+            (DragonBody::Obsidian, [58, 68, 102, 255]),
         ] {
-            let open_mouth = paint_mouth_alone(koi_body, 1.0);
+            let open_mouth = paint_mouth_alone(dragon_body, 1.0);
             assert_eq!(center_pixel(&open_mouth), OUTLINE_COLOR);
-            assert!(open_mouth.contains(&rim_color), "{koi_body:?}");
+            assert!(open_mouth.contains(&rim_color), "{dragon_body:?}");
             assert!(
                 open_mouth
                     .iter()
                     .all(|&pixel| pixel == [0; 4] || pixel == OUTLINE_COLOR || pixel == rim_color)
             );
         }
-        let half_open = count_painted(&paint_mouth_alone(KoiBody::White, 0.5));
-        let wide_open = count_painted(&paint_mouth_alone(KoiBody::White, 1.0));
+        let half_open = count_painted(&paint_mouth_alone(DragonBody::Emerald, 0.5));
+        let wide_open = count_painted(&paint_mouth_alone(DragonBody::Emerald, 1.0));
         assert!(0 < half_open && half_open < wide_open);
     }
 }

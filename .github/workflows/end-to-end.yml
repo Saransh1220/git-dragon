@@ -1,6 +1,6 @@
 name: End to end
 
-# Build git-koi from this checkout, collect the repository owner's real snapshot through
+# Build git-dragon from this checkout, collect the repository owner's real snapshot through
 # GitHub's API, render it, and attach the result. Nothing is committed. The Action's own
 # download path is proved by the release workflow instead, against each new release.
 on:
@@ -25,15 +25,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run:
-          ./target/release/git-koi collect "$GITHUB_REPOSITORY_OWNER" --output
-          koi-snapshot.json
-      - name: Render the koi
+          ./target/release/git-dragon collect "$GITHUB_REPOSITORY_OWNER" --output
+          dragon-snapshot.json
+      - name: Render the dragon
         run:
-          ./target/release/git-koi render koi-snapshot.json --output-dir
-          koi-output
-      - name: Attach the koi
+          ./target/release/git-dragon render dragon-snapshot.json --output-dir
+          dragon-output
+      - name: Attach the dragon
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: koi
-          path: koi-output/
+          name: dragon
+          path: dragon-output/
           if-no-files-found: error

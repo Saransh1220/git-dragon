@@ -1,19 +1,19 @@
 use chrono::{Datelike, Days, NaiveDate};
-use git_koi::history::{AccountSnapshot, ContributionDay, ContributionHistory, ContributionWeek};
-use git_koi::koi::{KoiDevelopment, RecentStreak, derive_koi_development};
-use git_koi::markings::calculate_streak_marks;
+use git_dragon::history::{AccountSnapshot, ContributionDay, ContributionHistory, ContributionWeek};
+use git_dragon::dragon::{DragonDevelopment, RecentStreak, derive_dragon_development};
+use git_dragon::markings::calculate_streak_marks;
 
 #[test]
 fn streak_fins_build_linearly_to_full_at_thirteen_weeks() {
     for (streak_week_count, expected_strength) in
         [(1, 1.0 / 13.0), (6, 6.0 / 13.0), (13, 1.0), (20, 1.0)]
     {
-        let koi_development = develop_with_streaks(
+        let dragon_development = develop_with_streaks(
             streak_week_count,
             Some(RecentStreak::Current(build_weeks(streak_week_count))),
         );
         assert_close(
-            calculate_streak_marks(&koi_development).streak_fin_strength,
+            calculate_streak_marks(&dragon_development).streak_fin_strength,
             expected_strength,
         );
     }
@@ -30,8 +30,8 @@ fn streak_fins_fade_to_nothing_six_and_a_half_weeks_after_a_streak_ends() {
         (46, 0.0),
         (365, 0.0),
     ] {
-        let koi_development = develop_after_streak_end(13, days_since_end);
-        let streak_fin_strength = calculate_streak_marks(&koi_development).streak_fin_strength;
+        let dragon_development = develop_after_streak_end(13, days_since_end);
+        let streak_fin_strength = calculate_streak_marks(&dragon_development).streak_fin_strength;
         assert!(
             (streak_fin_strength - expected_strength).abs() < 0.00001,
             "{days_since_end} days after: {streak_fin_strength}"
@@ -92,25 +92,25 @@ fn quiet_weeks_fade_the_fins_without_lowering_the_longest_streak_marks() {
 fn develop_with_streaks(
     longest_week_count: usize,
     recent_streak: Option<RecentStreak>,
-) -> KoiDevelopment {
-    let mut koi_development = read_fixture_development();
-    koi_development.streaks.longest = build_weeks(longest_week_count);
-    koi_development.streaks.recent = recent_streak;
-    koi_development
+) -> DragonDevelopment {
+    let mut dragon_development = read_fixture_development();
+    dragon_development.streaks.longest = build_weeks(longest_week_count);
+    dragon_development.streaks.recent = recent_streak;
+    dragon_development
 }
 
-fn develop_after_streak_end(streak_week_count: usize, days_since_end: u64) -> KoiDevelopment {
-    let mut koi_development = read_fixture_development();
-    let ended_on = koi_development.observed_on - Days::new(days_since_end);
-    koi_development.streaks.longest = build_weeks(streak_week_count);
-    koi_development.streaks.recent = Some(RecentStreak::Ended {
+fn develop_after_streak_end(streak_week_count: usize, days_since_end: u64) -> DragonDevelopment {
+    let mut dragon_development = read_fixture_development();
+    let ended_on = dragon_development.observed_on - Days::new(days_since_end);
+    dragon_development.streaks.longest = build_weeks(streak_week_count);
+    dragon_development.streaks.recent = Some(RecentStreak::Ended {
         weeks: build_weeks(streak_week_count),
         ended_on,
     });
-    koi_development
+    dragon_development
 }
 
-fn develop_from_daily_counts(first_monday: NaiveDate, daily_counts: &[u32]) -> KoiDevelopment {
+fn develop_from_daily_counts(first_monday: NaiveDate, daily_counts: &[u32]) -> DragonDevelopment {
     let mut account_snapshot: AccountSnapshot =
         serde_json::from_str(include_str!("fixtures/account-with-history.json")).unwrap();
     let contribution_days: Vec<_> = daily_counts
@@ -125,13 +125,13 @@ fn develop_from_daily_counts(first_monday: NaiveDate, daily_counts: &[u32]) -> K
         observed_on: contribution_days.last().unwrap().date,
         days: contribution_days,
     });
-    derive_koi_development(&account_snapshot).unwrap()
+    derive_dragon_development(&account_snapshot).unwrap()
 }
 
-fn read_fixture_development() -> KoiDevelopment {
+fn read_fixture_development() -> DragonDevelopment {
     let account_snapshot =
         serde_json::from_str(include_str!("fixtures/account-with-history.json")).unwrap();
-    derive_koi_development(&account_snapshot).unwrap()
+    derive_dragon_development(&account_snapshot).unwrap()
 }
 
 /// Fully active weeks; marks depend only on how many there are.
